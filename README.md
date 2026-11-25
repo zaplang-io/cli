@@ -6,53 +6,72 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 - Contributor & agent conventions: [AGENTS.md](AGENTS.md)
 - Design decisions: [DECISIONS.md](DECISIONS.md)
 
-This repository is at the **scaffold** stage — governance and layout only, no library code yet. The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/1) tracks the public surface and the phased implementation.
+The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
+first release. The framework API below is proposed in
+[#3](https://github.com/zaplang-io/cli/issues/3). The checkout currently
+contains the package scaffold.
 
-## Goals
+## First-release scope
 
-A typed Zap CLI framework whose public API mirrors Python's [**click**](https://click.palletsprojects.com/) and [**typer**](https://typer.tiangolo.com/) as closely as Zap's static typing allows. API-parity with the popular Python libraries is a project rule — see [AGENTS.md](AGENTS.md).
-
-`cli` is the **high-level, declarative layer**. It does **not** reimplement token-level argument parsing: it builds on Zap core's `argparse` `ArgumentParser` object ([zaplang-io/zap#997](https://github.com/zaplang-io/zap/issues/997), merged) as its parsing engine, and adds the command/option declaration surface, subcommand grouping, automatic `--help` rendering, and exit-code conventions on top. Core owns *how argv is parsed*; `cli` owns *how commands are declared, dispatched, and reported*.
-
-## Planned surface (first cut)
-
-The exact signatures (decorator vs. declaration form, keyword-vs-positional, defaults, return shapes) are **not final** — see the epic. Illustrative only:
-
-```zap
-import cli
-
-# A command: typed options and arguments, auto --help.
-@cli.command(help="Greet a user.")
-@cli.option("--count", int64, default=1, help="Repetitions.")
-@cli.argument("name", str)
-def greet(int64 count, str name):
-    for _ in range(count):
-        print("Hello " + name)
-
-# A group with subcommands (git-style: tool build / tool test).
-app = cli.Group(name="tool")
-app.add(greet)
-
-def main():
-    app.run()   # parses argv, dispatches, prints --help, returns an exit code
-```
-
-Python analogs:
-
-| Concern | click | typer | Proposed Zap surface |
+| Concern | Click | Typer | Proposed Zap contract |
 | --- | --- | --- | --- |
-| Declare a command | `@click.command()` | function + `typer.Typer()` | `@cli.command(...)` |
-| Typed option | `@click.option("--n", type=int)` | typed param + `typer.Option` | `@cli.option("--n", int64, ...)` |
-| Positional argument | `@click.argument("name")` | typed param + `typer.Argument` | `@cli.argument("name", str)` |
-| Group / subcommands | `@click.group()` | nested `Typer` | `cli.Group(...)` + `.add(...)` |
-| Automatic `--help` | built-in | built-in | rendered from declared metadata |
-| Error / exit | `click.UsageError`, `ctx.exit(code)` | `typer.Exit`, `typer.Abort` | `cli.UsageError`, `cli.Exit`, `cli.Abort` |
+| Command declaration | `@click.command()` turns the function into a command | `@app.command()` registers a typed function | Use a typed handler with explicit CLI metadata. The declaration form is pending. |
+| Option | `@click.option("--count", type=int, default=1)` | `count: Annotated[int, typer.Option()] = 1` | Long `--name value` and `--name=value` for `str` and `int64`. A `bool` option is a flag. Declare a typed default or mark a value option required. |
+| Positional | `@click.argument("name")` | A required typed parameter or `typer.Argument()` | Declare names and types in CLI order. Each required positional consumes one value. |
+| Group | `@click.group()` and `add_command()` | `Typer()` and `add_typer()` | Register named subcommands with one level of grouping. Subcommand options follow the subcommand name. |
+| Help | Automatic command and group help | Automatic command and group help | `-h` and `--help` show help on stdout and return 0 without invoking a handler. Group help lists subcommands and their summaries. Command help lists usage, positionals, options, and defaults. |
+| Usage error | `click.UsageError` maps to 2 | Invalid invocation exits 2 | `cli.UsageError(message)` maps to a diagnostic and usage on stderr and status 2. |
+| Explicit exit or abort | `ctx.exit(code)`, `click.Abort()` | `typer.Exit(code=...)`, `typer.Abort()` | `cli.Exit(code)` returns that status silently. `cli.Abort()` writes `Aborted.` to stderr and returns 1. Normal handler completion returns 0. |
 
-## Phased plan
+See [Click options](https://click.palletsprojects.com/en/stable/options/),
+[Click commands and groups](https://click.palletsprojects.com/en/stable/commands-and-groups/),
+[Click exit codes](https://click.palletsprojects.com/en/stable/exceptions/),
+and [Typer command options](https://typer.tiangolo.com/tutorial/commands/options/).
+[DECISIONS.md](DECISIONS.md) lists the pending signatures and decisions.
 
-- **Phase 0 — docs-first.** Pin the public surface, the layering over core `argparse`, README, DECISIONS, threat model. ([#2](https://github.com/zaplang-io/cli/issues/2))
-- **Phase 1 — first slice.** Command + typed options & arguments ([#3](https://github.com/zaplang-io/cli/issues/3)); groups / subcommands + automatic `--help` ([#4](https://github.com/zaplang-io/cli/issues/4)); error handling + exit codes ([#5](https://github.com/zaplang-io/cli/issues/5)).
-- **Phase 2+ — breadth (named in the epic, not yet filed).** Prompts & confirmation, progress bars, environment-variable binding, shell completion, rich help rendering.
+## Core `argparse` boundary
+
+The parser is Zap core's object API from
+[zaplang-io/zap#997](https://github.com/zaplang-io/zap/issues/997).
+The framework owns command metadata, typed handler binding, dispatch, help
+presentation, and the status and I/O at the run boundary.
+
+| Input or operation | Core API | Framework responsibility |
+| --- | --- | --- |
+| Command metadata | `ArgumentParser(prog=..., description=...)` | Construct one parser for each command from its declared name and help. |
+| Value options and positionals | `add_argument(name, type=..., default=..., required=..., help=...)` | Use core's `"str"` and `"int"` tags and serialize typed option defaults for the parser. Core scans argv and consumes positionals in declaration order. |
+| Boolean flags | `add_argument(name, action="store_true")` or `action="store_false"` | Choose an action to express the declared polarity and use `Namespace.get_flag` to obtain the value. |
+| Parsing and invocation | `parse_args(argv)`, `Namespace.get_str`, `get_int`, `get_flag`, and `has` | Pass argv without the executable name. Bind the validated values to declared parameter types and invoke the selected handler once. |
+| Subcommands | `add_subparsers(dest=...)`, `add_parser(name, help=...)`, and `Namespace.get_str` | Keep the selector destination distinct from handler parameters. Register the child parsers and dispatch using the selected name returned by core. |
+| Help | `Namespace.help_requested()` and `ArgumentParser.format_help()` | Select the help for the parsed command, add declared defaults and summaries from metadata, and handle the stdout and exit status. |
+| Parse failures | Catchable failures from `parse_args(argv)` | Translate input failures to `cli.UsageError` and include the valid command names in diagnostics for an unknown subcommand. |
+
+Core tracks malformed option arity in
+[zaplang-io/zap#1508](https://github.com/zaplang-io/zap/issues/1508) and
+end-of-options handling in
+[zaplang-io/zap#1507](https://github.com/zaplang-io/zap/issues/1507).
+Both belong to the core scanner. Core currently accepts one name per
+argument and has no variadic positional argument API.
+
+## Threat model
+
+Treat argv as untrusted. Unknown options and commands, missing or extra
+arguments, and type mismatches must become typed usage errors with a nonzero
+status without dispatching the handler. Help uses declaration metadata and
+must never execute handler code. The framework inherits the host and core
+parser's argv bounds, including for oversized tokens and large argument counts.
+The framework stores no credentials. Environment-variable binding is deferred
+and will require explicit opt-in per option.
+
+## Implementation order
+
+- [#3 Public surface and core parser boundary](https://github.com/zaplang-io/cli/issues/3)
+- [#4 Commands, typed options, and arguments](https://github.com/zaplang-io/cli/issues/4)
+- [#5 Groups, subcommands, and automatic help](https://github.com/zaplang-io/cli/issues/5)
+- [#6 Error handling and exit codes](https://github.com/zaplang-io/cli/issues/6)
+
+Prompts and confirmation, progress bars, environment-variable binding, shell
+completion, and rich help are later work tracked in the epic.
 
 ## Build and test
 
