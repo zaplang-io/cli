@@ -110,3 +110,60 @@ def _core_parser_rejects_an_unknown_subcommand():
     except Exception as error:
         rejected = error.find("unknown") >= 0
     assert rejected
+
+@test
+def _core_parser_treats_tokens_after_the_separator_as_positional():
+    auto parser = argparse.ArgumentParser()
+    parser.add_argument("--name")
+    parser.add_argument("first")
+    parser.add_argument("second")
+    parser.add_argument("third")
+
+    auto ns = parser.parse_args(["--name", "label", "--", "--help", "-draft", "--"])
+    assert ns.get_str("name") == "label"
+    assert ns.get_str("first") == "--help"
+    assert ns.get_str("second") == "-draft"
+    assert ns.get_str("third") == "--"
+    assert not ns.help_requested()
+
+@test
+def _core_parser_preserves_explicit_option_like_values():
+    auto parser = argparse.ArgumentParser()
+    parser.add_argument("--name")
+    parser.add_argument("--verbose", action="store_true")
+
+    auto explicit = parser.parse_args(["--name=--verbose"])
+    assert explicit.get_str("name") == "--verbose"
+    assert not explicit.get_flag("verbose")
+    auto empty = parser.parse_args(["--name="])
+    assert empty.has("name")
+    assert empty.get_str("name") == ""
+    auto stdin_value = parser.parse_args(["--name", "-"])
+    assert stdin_value.get_str("name") == "-"
+
+@test
+def _core_parser_rejects_an_option_token_in_place_of_a_value():
+    auto parser = argparse.ArgumentParser()
+    parser.add_argument("--name")
+    parser.add_argument("--verbose", action="store_true")
+
+    for next_token in ["--verbose", "--unknown", "--"]:
+        bool rejected = False
+        try:
+            parser.parse_args(["--name", next_token])
+        except Exception as error:
+            rejected = error.find("--name") >= 0 and error.find("expected one argument") >= 0
+        assert rejected
+
+@test
+def _core_parser_rejects_attached_values_on_boolean_flags():
+    auto parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", action="store_true")
+
+    for token in ["--verbose=false", "--verbose="]:
+        bool rejected = False
+        try:
+            parser.parse_args([token])
+        except Exception as error:
+            rejected = error.find("--verbose") >= 0 and error.find("ignored explicit argument") >= 0
+        assert rejected

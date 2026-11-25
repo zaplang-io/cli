@@ -69,15 +69,15 @@ presentation, and the status and I/O at the run boundary.
 | Help | `Namespace.help_requested()` and `ArgumentParser.format_help()` | Select the help for the parsed command, add declared defaults and summaries from metadata, and handle the stdout and exit status. |
 | Parse failures | Catchable failures from `parse_args(argv)` | Translate input failures to `cli.UsageError` and include the valid command names in diagnostics for an unknown subcommand. |
 
-Core tracks malformed option arity in
-[zaplang-io/zap#1508](https://github.com/zaplang-io/zap/issues/1508) and
-end-of-options handling in
-[zaplang-io/zap#1507](https://github.com/zaplang-io/zap/issues/1507).
-Command-object binding is tracked in
-[zaplang-io/zap#1509](https://github.com/zaplang-io/zap/issues/1509).
-Those dependencies gate [#4](https://github.com/zaplang-io/cli/issues/4).
-Core currently accepts one name per
-argument and has no variadic positional argument API.
+Zap core now rejects malformed option values and honors `--` as the
+end-of-options separator. See
+[zaplang-io/zap#1512](https://github.com/zaplang-io/zap/pull/1512).
+Returning decorators can bind command objects on local struct receivers.
+The `import cli; @cli.command` package API requires imported-module decorator
+resolution in [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519),
+which blocks [#4](https://github.com/zaplang-io/cli/issues/4).
+Core accepts one name per argument and has no variadic positional argument
+API.
 
 ## Threat model
 

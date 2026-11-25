@@ -20,10 +20,11 @@ types match the declarations.
 [Click option names](https://click.palletsprojects.com/en/stable/options/)
 [Typer commands](https://typer.tiangolo.com/tutorial/commands/)
 
-Current Zap dotted decorators emit a registration call and preserve the
-decorated binding as a function. Behavioral wrappers keep the original
-signature. The selected command-object surface is gated on
-[zaplang-io/zap#1509](https://github.com/zaplang-io/zap/issues/1509).
+A dotted decorator can bind its returned object when core resolves the
+receiver as a local struct and the method declares a return type. Stacks
+compose bottom-up. The package form requires the same semantics for imported
+module functions. See [zaplang-io/zap#1515](https://github.com/zaplang-io/zap/pull/1515)
+and [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519).
 
 ## Signatures and defaults
 
@@ -94,6 +95,6 @@ and matching, validation, and child parser selection. Bind the returned
 framework metadata for defaults and command summaries. The framework controls
 when a handler or diagnostic runs.
 
-Core dependencies for matching malformed input and option-like positionals
-are tracked in [zaplang-io/zap#1508](https://github.com/zaplang-io/zap/issues/1508)
-and [zaplang-io/zap#1507](https://github.com/zaplang-io/zap/issues/1507).
+Core recognizes the `--` separator, rejects an option-like token in place of a
+missing option value, and rejects attached values on boolean flags.
+[zaplang-io/zap#1512](https://github.com/zaplang-io/zap/pull/1512)
