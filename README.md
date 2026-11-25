@@ -7,27 +7,50 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 - Design decisions: [DECISIONS.md](DECISIONS.md)
 
 The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
-first release. The framework API below is proposed in
+first release. The framework contract below is specified in
 [#3](https://github.com/zaplang-io/cli/issues/3). The checkout currently
-contains the package scaffold.
+contains the package scaffold. The example describes the intended API.
 
 ## First-release scope
 
-| Concern | Click | Typer | Proposed Zap contract |
+```zap
+import cli
+
+@cli.command(help="Greet a user.")
+@cli.option("--count", int64, default=1, help="Number of greetings.")
+@cli.option("--shout", bool, default=False, help="Use uppercase.")
+@cli.argument("name", str, help="Person to greet.")
+def greet(cli.Context ctx, int64 count, bool shout, str name):
+    str greeting = "HELLO " + name if shout else "Hello " + name
+    for _ in range(count):
+        print(greeting)
+
+def main():
+    auto app = cli.Group(name="tool", help="Example commands.")
+    app.add(greet)
+    app.run()
+```
+
+`greet` is a `cli.Command`, so it can also be run directly with
+`greet.run()`. A handler can declare `cli.Context ctx` as its first parameter
+to receive invocation metadata. The other parameters receive declared option
+and positional values.
+
+| Concern | Click | Typer | Zap contract |
 | --- | --- | --- | --- |
-| Command declaration | `@click.command()` turns the function into a command | `@app.command()` registers a typed function | Use a typed handler with explicit CLI metadata. The declaration form is pending. |
-| Option | `@click.option("--count", type=int, default=1)` | `count: Annotated[int, typer.Option()] = 1` | Long `--name value` and `--name=value` for `str` and `int64`. A `bool` option is a flag. Declare a typed default or mark a value option required. |
+| Command declaration | `@click.command()` turns the function into a command | `@app.command()` registers a typed function | `@cli.command(name=..., help=...)` builds a command object from a typed handler and stacked metadata decorators. |
+| Option | `@click.option("--count", type=int, default=1)` | `count: Annotated[int, typer.Option()] = 1` | Long `--name value` and `--name=value` for `str` and `int64`. A `bool` option is a flag. Pass `default=...` or `required=True` for each value option. Flags default to `False` and store `True` when present. |
 | Positional | `@click.argument("name")` | A required typed parameter or `typer.Argument()` | Declare names and types in CLI order. Each required positional consumes one value. |
 | Group | `@click.group()` and `add_command()` | `Typer()` and `add_typer()` | Register named subcommands with one level of grouping. Subcommand options follow the subcommand name. |
-| Help | Automatic command and group help | Automatic command and group help | `-h` and `--help` show help on stdout and return 0 without invoking a handler. Group help lists subcommands and their summaries. Command help lists usage, positionals, options, and defaults. |
+| Help | Automatic command and group help | Automatic command and group help | `-h` and `--help` show help on stdout and exit 0 without invoking a handler. Group help lists subcommands and their summaries. Command help lists usage, positionals, options, and defaults. |
 | Usage error | `click.UsageError` maps to 2 | Invalid invocation exits 2 | `cli.UsageError(message)` maps to a diagnostic and usage on stderr and status 2. |
-| Explicit exit or abort | `ctx.exit(code)`, `click.Abort()` | `typer.Exit(code=...)`, `typer.Abort()` | `cli.Exit(code)` returns that status silently. `cli.Abort()` writes `Aborted.` to stderr and returns 1. Normal handler completion returns 0. |
+| Explicit exit or abort | `ctx.exit(code)`, `click.Abort()` | `typer.Exit(code=...)`, `typer.Abort()` | `cli.Exit(code)` exits with that status silently. `cli.Abort()` writes `Aborted.` to stderr and exits 1. Normal handler completion exits 0. |
 
 See [Click options](https://click.palletsprojects.com/en/stable/options/),
 [Click commands and groups](https://click.palletsprojects.com/en/stable/commands-and-groups/),
 [Click exit codes](https://click.palletsprojects.com/en/stable/exceptions/),
 and [Typer command options](https://typer.tiangolo.com/tutorial/commands/options/).
-[DECISIONS.md](DECISIONS.md) lists the pending signatures and decisions.
+[DECISIONS.md](DECISIONS.md) specifies signatures, defaults, and standalone behavior.
 
 ## Core `argparse` boundary
 
@@ -40,7 +63,7 @@ presentation, and the status and I/O at the run boundary.
 | --- | --- | --- |
 | Command metadata | `ArgumentParser(prog=..., description=...)` | Construct one parser for each command from its declared name and help. |
 | Value options and positionals | `add_argument(name, type=..., default=..., required=..., help=...)` | Use core's `"str"` and `"int"` tags and serialize typed option defaults for the parser. Core scans argv and consumes positionals in declaration order. |
-| Boolean flags | `add_argument(name, action="store_true")` or `action="store_false"` | Choose an action to express the declared polarity and use `Namespace.get_flag` to obtain the value. |
+| Boolean flags | `add_argument(name, action="store_true")` | Use `Namespace.get_flag` to obtain the boolean value. |
 | Parsing and invocation | `parse_args(argv)`, `Namespace.get_str`, `get_int`, `get_flag`, and `has` | Pass argv without the executable name. Bind the validated values to declared parameter types and invoke the selected handler once. |
 | Subcommands | `add_subparsers(dest=...)`, `add_parser(name, help=...)`, and `Namespace.get_str` | Keep the selector destination distinct from handler parameters. Register the child parsers and dispatch using the selected name returned by core. |
 | Help | `Namespace.help_requested()` and `ArgumentParser.format_help()` | Select the help for the parsed command, add declared defaults and summaries from metadata, and handle the stdout and exit status. |
@@ -50,7 +73,10 @@ Core tracks malformed option arity in
 [zaplang-io/zap#1508](https://github.com/zaplang-io/zap/issues/1508) and
 end-of-options handling in
 [zaplang-io/zap#1507](https://github.com/zaplang-io/zap/issues/1507).
-Both belong to the core scanner. Core currently accepts one name per
+Command-object binding is tracked in
+[zaplang-io/zap#1509](https://github.com/zaplang-io/zap/issues/1509).
+Those dependencies gate [#4](https://github.com/zaplang-io/cli/issues/4).
+Core currently accepts one name per
 argument and has no variadic positional argument API.
 
 ## Threat model
