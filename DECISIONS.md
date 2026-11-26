@@ -26,6 +26,9 @@ parameters by name through `fn(Namespace)`.
 [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519) ·
 [zaplang-io/zap#1544](https://github.com/zaplang-io/zap/issues/1544)
 
+The remaining stack-composition dependency is
+[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647).
+
 ## Signatures and defaults
 
 - `option(name, type, default=..., required=False, help="")` takes the long
@@ -54,7 +57,7 @@ supplies it directly. `command_name` is the selected command's name and
 For example, running `tool build` produces `["tool", "build"]`. A directly run
 command has a one-element path. This first slice uses a concrete context type
 for invocation metadata. Application-specific context storage is deferred.
-The compiler adapter still needs to pass explicit context through.
+Core passes explicit context through the `fn(Context, Namespace)` adapter seam.
 [zaplang-io/zap#1621](https://github.com/zaplang-io/zap/issues/1621)
 [Click contexts](https://click.palletsprojects.com/en/stable/commands-and-groups/#context)
 [Typer context](https://typer.tiangolo.com/tutorial/commands/context/)

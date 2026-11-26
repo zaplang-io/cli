@@ -9,7 +9,8 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
 first release. The framework contract below is specified in
 [#3](https://github.com/zaplang-io/cli/issues/3). The checkout exposes
-`Context` and `UsageError`. The example describes the intended command API.
+`Context`, `UsageError`, and the configured `Command` runtime. The example
+describes the intended declaration API.
 
 ## First-release scope
 
@@ -72,12 +73,10 @@ presentation, and the status and I/O at the run boundary.
 Zap core now rejects malformed option values and honors `--` as the
 end-of-options separator. See
 [zaplang-io/zap#1512](https://github.com/zaplang-io/zap/pull/1512).
-Core supports returning decorators from imported packages and synthesizes
-typed adapters for scalar handler parameters. Explicit framework-provided
-context remains an upstream dependency for [#4](https://github.com/zaplang-io/cli/issues/4).
-[zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519) ·
-[zaplang-io/zap#1544](https://github.com/zaplang-io/zap/issues/1544) ·
-[zaplang-io/zap#1621](https://github.com/zaplang-io/zap/issues/1621)
+Core supports returning decorators from imported packages, typed adapters, and
+explicit context. Package factories still need a uniform way to compose a full
+stack of command, option, and argument decorators.
+[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647)
 Core accepts one name per argument and has no variadic positional argument
 API.
 

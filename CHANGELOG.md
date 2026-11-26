@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add the public `Context` and typed `UsageError` types for command handlers.
+- Add the configured `Command` runtime, public `Context`, and typed
+  `UsageError` for malformed invocations.
   [cli#4](https://github.com/zaplang-io/cli/issues/4)
 
 - Specify the first-release CLI contract, document its core parser boundary and
