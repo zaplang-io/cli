@@ -26,8 +26,15 @@ parameters by name through `fn(Namespace)`.
 [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519) ·
 [zaplang-io/zap#1544](https://github.com/zaplang-io/zap/issues/1544)
 
-The remaining stack-composition dependency is
-[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647).
+Core passes the adapted callback to the innermost generic decorator and the
+composed command to each outer decorator. Imported factories need callback
+type inference and static type selection to normalize the two inputs.
+The compiler also needs to expose the
+original declaration name for the omitted-name form.
+[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647) ·
+[zaplang-io/zap#1669](https://github.com/zaplang-io/zap/issues/1669) ·
+[zaplang-io/zap#1668](https://github.com/zaplang-io/zap/issues/1668) ·
+[zaplang-io/zap#1665](https://github.com/zaplang-io/zap/issues/1665)
 
 ## Signatures and defaults
 

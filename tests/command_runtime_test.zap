@@ -97,3 +97,27 @@ def _unexpected_handler(cli.Context ctx, Namespace ns):
 
 def _broken_handler(cli.Context ctx, Namespace ns):
     raise ValueError("handler failed")
+
+@test
+def _command_binds_typed_positionals_and_preserves_literal_help_after_separator():
+    auto parser = argparse.ArgumentParser(prog="copy")
+    parser.add_argument("count", type="int")
+    parser.add_argument("path")
+
+    list[str] calls = []
+    fn(cli.Context, Namespace) record = lambda ctx, ns: calls.append(ctx.command_name + ":" + str(ns.get_int("count")) + ":" + ns.get_str("path"))
+    auto cmd = cli.Command(name="copy", _parser=parser, _handler=record)
+    assert cmd.run(argv=["-h"], standalone_mode=False) == 0
+    assert len(calls) == 0
+    assert cmd.run(argv=["-2", "--", "--help"], standalone_mode=False) == 0
+    assert cmd.run(argv=["0", "--", "-draft"], standalone_mode=False) == 0
+    assert calls == ["copy:-2:--help", "copy:0:-draft"]
+
+    bool caught = False
+    try:
+        cmd.run(argv=["not-an-integer", "file"], standalone_mode=False)
+    except cli.UsageError as error:
+        assert error.find("not-an-integer") >= 0
+        caught = True
+    assert caught
+    assert len(calls) == 2

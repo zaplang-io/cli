@@ -73,10 +73,13 @@ presentation, and the status and I/O at the run boundary.
 Zap core now rejects malformed option values and honors `--` as the
 end-of-options separator. See
 [zaplang-io/zap#1512](https://github.com/zaplang-io/zap/pull/1512).
-Core supports returning decorators from imported packages, typed adapters, and
-explicit context. Package factories still need a uniform way to compose a full
-stack of command, option, and argument decorators.
-[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647)
+Core supports returning decorators from imported packages, typed adapters,
+explicit context, and a generic input for repeated decorators. The declaration
+API still needs imported callback type inference, static selection between
+callbacks and composed commands, and default command names.
+[zaplang-io/zap#1669](https://github.com/zaplang-io/zap/issues/1669) ·
+[zaplang-io/zap#1668](https://github.com/zaplang-io/zap/issues/1668) ·
+[zaplang-io/zap#1665](https://github.com/zaplang-io/zap/issues/1665)
 Core accepts one name per argument and has no variadic positional argument
 API.
 
