@@ -59,7 +59,7 @@ def _standalone_parse_failures_and_unrelated_handler_exceptions_keep_distinct_st
         auto code, out, err = process.run(["./error_commands", *entry, "unrelated"])
         assert code == 1 and out == ""
         assert err.find("unexpected handler failure") >= 0
-        assert err.find("ValueError") >= 0
+        assert err.find("Uncaught exception:") >= 0
         assert err.find("usage:") < 0
 
 def _embedded_exit(cli.Context ctx, Namespace ns):
