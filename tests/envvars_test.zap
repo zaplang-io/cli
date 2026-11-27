@@ -10,27 +10,31 @@ def _environment_options_follow_argv_envvar_default_precedence():
     for entry in entries:
         list[str] start = ["./env_commands", *entry]
         auto env_code, env_out, env_err = process.run(start, env=environment)
-        assert env_code == 0 and env_err == ""
+        assert env_err == ""
+        assert env_code == 0
         assert env_out == "configured:env-endpoint:7:env-label:local\n"
 
         auto argv_code, argv_out, argv_err = process.run(
             [*start, "--jobs=9", "--label=", "--endpoint", "argv-endpoint"],
             env=environment,
         )
-        assert argv_code == 0 and argv_err == ""
+        assert argv_err == ""
+        assert argv_code == 0
         assert argv_out == "configured:argv-endpoint:9::local\n"
 
         auto empty_code, empty_out, empty_err = process.run(
             [*start, "--endpoint="],
             env=environment,
         )
-        assert empty_code == 0 and empty_err == ""
+        assert empty_err == ""
+        assert empty_code == 0
         assert empty_out == "configured::7:env-label:local\n"
 
 @test
 def _unset_and_empty_environment_variables_fall_back_to_declared_defaults():
     auto code, out, err = process.run(["./env_commands", "--endpoint=cli"])
-    assert code == 0 and err == ""
+    assert err == ""
+    assert code == 0
     assert out == "configured:cli:2:standard:local\n"
 
     dict[str, str] empty = {
@@ -42,7 +46,8 @@ def _unset_and_empty_environment_variables_fall_back_to_declared_defaults():
         ["./env_commands", "--endpoint=cli"],
         env=empty,
     )
-    assert empty_code == 0 and empty_err == ""
+    assert empty_err == ""
+    assert empty_code == 0
     assert empty_out == out
 
     auto required_code, required_out, required_err = process.run(
@@ -71,7 +76,8 @@ def _invalid_environment_is_redacted_and_only_validated_when_selected():
             [*start, "--jobs", "3"],
             env=environment,
         )
-        assert override_code == 0 and override_err == ""
+        assert override_err == ""
+        assert override_code == 0
         assert override_out == "configured:private-target:3:private-label:local\n"
 
         auto help_code, help_out, help_err = process.run(
@@ -90,7 +96,8 @@ def _embedded_invalid_environment_raises_usage_error():
         ["./env_commands", "embedded", "--endpoint=provided"],
         env={"ZAP_CLI_ENV_JOBS": "secret-invalid"},
     )
-    assert code == 0 and err == ""
+    assert err == ""
+    assert code == 0
     assert out == "typed: environment variable ZAP_CLI_ENV_JOBS for --jobs requires an integer\n"
 
 @test
@@ -100,11 +107,13 @@ def _boolean_environment_values_follow_click_activation_rules():
         list[str] start = ["./env_commands", *entry]
         for value in ["true", "1", " YeS ", "ON", "t", "Y"]:
             auto code, out, err = process.run(start, env={"ZAP_CLI_ENV_VERBOSE": value})
-            assert code == 0 and err == ""
+            assert err == ""
+            assert code == 0
             assert out == "verbose=True\n"
         for value in ["false", "0", " No ", "off", "f", "n", "", "unknown"]:
             auto code, out, err = process.run(start, env={"ZAP_CLI_ENV_VERBOSE": value})
-            assert code == 0 and err == ""
+            assert err == ""
+            assert code == 0
             assert out == "verbose=False\n"
 
 @test
@@ -129,7 +138,8 @@ def _explicit_boolean_switch_overrides_environment_and_help_stays_declarative():
             [*start, "--help"],
             env={"ZAP_CLI_ENV_VERBOSE": "on"},
         )
-        assert help_code == 0 and help_err == ""
+        assert help_err == ""
+        assert help_code == 0
         assert help_out.find("Show details. [default: False]") >= 0
         assert help_out.find("ZAP_CLI_ENV_VERBOSE") < 0
         assert help_out.find("verbose=True") < 0
