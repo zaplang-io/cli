@@ -26,15 +26,15 @@ parameters by name through `fn(Namespace)`.
 [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519) ·
 [zaplang-io/zap#1544](https://github.com/zaplang-io/zap/issues/1544)
 
-Core passes the adapted callback to the innermost generic decorator and the
-composed command to each outer decorator. Imported factories need callback
-type inference and static type selection to normalize the two inputs.
-The compiler also needs to expose the
-original declaration name for the omitted-name form.
-[zaplang-io/zap#1647](https://github.com/zaplang-io/zap/issues/1647) ·
-[zaplang-io/zap#1669](https://github.com/zaplang-io/zap/issues/1669) ·
-[zaplang-io/zap#1668](https://github.com/zaplang-io/zap/issues/1668) ·
-[zaplang-io/zap#1665](https://github.com/zaplang-io/zap/issues/1665)
+The innermost factory requests the literal `fn(Context, Namespace)` adapter
+seam. When the handler omits context, Zap synthesizes an adapter of that same
+declared type which ignores the context. Subsequent decorators receive a
+declaration containing the existing callback and the ordered parameter
+metadata. A separate factory parameter accepts that composed declaration,
+and the outer command factory registers the metadata with core `argparse`.
+This preserves Zap's monomorphic function model (D-0067).
+[Explicit context adapter](https://github.com/zaplang-io/zap/issues/1621) ·
+[Callback storage decision](https://github.com/zaplang-io/zap/issues/1674)
 
 ## Signatures and defaults
 
