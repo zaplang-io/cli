@@ -94,3 +94,33 @@ def _help_and_unsupported_prompt_types_do_not_read_input():
     auto code, out, err = process.run(["./prompt_commands", "unsupported"], input="y\n")
     assert code == 2 and out == ""
     assert err.find("prompt supports str and int64") >= 0
+
+@test
+def _hidden_input_suppresses_echo_and_restores_terminal_state():
+    for mode in ["hidden", "hidden-default", "hidden-retry"]:
+        auto code, out, err = process.run(
+            ["python3", "./tests/fixtures/prompt_pty.py", mode],
+        )
+        assert code == 0
+        assert out == "echo_disabled=True\necho_restored=True\naccepted\n"
+        assert err.find("Secret: ") == 0
+        assert err.find("secret-value") < 0
+        assert err.find("private-default") < 0
+        assert err.find("secret-invalid") < 0
+        if mode == "hidden-retry":
+            assert err.find("Error: Enter a valid integer.\nSecret: ") >= 0
+
+@test
+def _hidden_input_restores_echo_on_eof_and_rejects_a_pipe_without_reading():
+    auto code, out, err = process.run(
+        ["python3", "./tests/fixtures/prompt_pty.py", "hidden-eof"],
+    )
+    assert code == 1
+    assert out == "echo_disabled=True\necho_restored=True\n"
+    assert err == "Secret: Aborted.\n"
+
+    auto pipe_code, pipe_out, pipe_err = process.run(
+        ["./prompt_commands", "hidden-pipe"],
+        input="still-available\n",
+    )
+    assert pipe_code == 0 and pipe_out == "pipe rejected\n" and pipe_err == ""

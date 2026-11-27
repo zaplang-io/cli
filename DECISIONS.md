@@ -126,9 +126,15 @@ input retains the host's signal behavior.
 `confirm(text, default=False, abort=False)` accepts case-insensitive
 `y`/`yes` and `n`/`no` after stripping surrounding whitespace. An empty line
 selects the default and an invalid answer retries. A decline raises
-`Abort()` when `abort=True`. Hidden manual input is in scope and depends on
-[zaplang-io/zap#1684](https://github.com/zaplang-io/zap/issues/1684). Decorator
-prompting is deferred.
+`Abort()` when `abort=True`.
+
+`prompt(text, kind, default=..., hide_input=False)` accepts named
+`hide_input=True` for manual hidden input. Use core `sys.getpass` for echo
+control, with the prompt and retries on stderr. Omit default values from
+hidden prompt text. Preserve the core `OSError` for non-terminal input and
+map hidden EOF to `Abort()`. A hard terminating signal during the read
+inherits core's terminal-restoration limitation. Decorator prompting is deferred.
+[Zap hidden input](https://github.com/zaplang-io/zap/blob/main/decisions/stdlib/1684-getpass-hidden-input.md)
 [Click prompts](https://click.palletsprojects.com/en/stable/prompts/)
 [Typer prompts](https://typer.tiangolo.com/tutorial/prompt/)
 

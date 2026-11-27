@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add typed visible prompts and confirmation with retries and EOF-to-abort handling.
+- Add typed visible and hidden prompts and confirmation with retries and
+  EOF-to-abort handling.
   [cli#11](https://github.com/zaplang-io/cli/issues/11)
 
 - Add typed `Exit` and `Abort` and share their status mapping with usage

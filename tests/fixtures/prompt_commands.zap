@@ -21,6 +21,24 @@ def ask(str mode):
         print(cli.confirm("Continue?", default=True))
     elif mode == "confirm-abort":
         print(cli.confirm("Continue?", abort=True))
+    elif mode == "hidden" or mode == "hidden-eof":
+        assert cli.prompt("Secret", str, hide_input=True) == "secret-value"
+        print("accepted")
+    elif mode == "hidden-default":
+        assert cli.prompt("Secret", str, default="private-default", hide_input=True) == "private-default"
+        print("accepted")
+    elif mode == "hidden-retry":
+        assert cli.prompt("Secret", int64, hide_input=True) == 42
+        print("accepted")
+    elif mode == "hidden-pipe":
+        bool rejected = False
+        try:
+            cli.prompt("Secret", str, hide_input=True)
+        except OSError:
+            rejected = True
+        assert rejected
+        assert input() == "still-available"
+        print("pipe rejected")
     else:
         bool value = cli.prompt("Continue?", bool)
         print(value)
