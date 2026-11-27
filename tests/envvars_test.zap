@@ -92,3 +92,44 @@ def _embedded_invalid_environment_raises_usage_error():
     )
     assert code == 0 and err == ""
     assert out == "typed: environment variable ZAP_CLI_ENV_JOBS for --jobs requires an integer\n"
+
+@test
+def _boolean_environment_values_follow_click_activation_rules():
+    list[list[str]] entries = [["toggle"], ["group", "toggle"]]
+    for entry in entries:
+        list[str] start = ["./env_commands", *entry]
+        for value in ["true", "1", " YeS ", "ON", "t", "Y"]:
+            auto code, out, err = process.run(start, env={"ZAP_CLI_ENV_VERBOSE": value})
+            assert code == 0 and err == ""
+            assert out == "verbose=True\n"
+        for value in ["false", "0", " No ", "off", "f", "n", "", "unknown"]:
+            auto code, out, err = process.run(start, env={"ZAP_CLI_ENV_VERBOSE": value})
+            assert code == 0 and err == ""
+            assert out == "verbose=False\n"
+
+@test
+def _explicit_boolean_switch_overrides_environment_and_help_stays_declarative():
+    list[list[str]] entries = [["toggle"], ["group", "toggle"]]
+    for entry in entries:
+        list[str] start = ["./env_commands", *entry]
+        auto code, out, err = process.run(
+            [*start, "--verbose"],
+            env={"ZAP_CLI_ENV_VERBOSE": "off"},
+        )
+        assert code == 0 and out == "verbose=True\n" and err == ""
+
+        auto malformed_code, malformed_out, malformed_err = process.run(
+            [*start, "--verbose=false"],
+            env={"ZAP_CLI_ENV_VERBOSE": "on"},
+        )
+        assert malformed_code == 2 and malformed_out == ""
+        assert malformed_err.find("--verbose") >= 0
+
+        auto help_code, help_out, help_err = process.run(
+            [*start, "--help"],
+            env={"ZAP_CLI_ENV_VERBOSE": "on"},
+        )
+        assert help_code == 0 and help_err == ""
+        assert help_out.find("Show details. [default: False]") >= 0
+        assert help_out.find("ZAP_CLI_ENV_VERBOSE") < 0
+        assert help_out.find("verbose=True") < 0

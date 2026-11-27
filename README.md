@@ -101,13 +101,14 @@ beyond the total raise `ValueError` without changing the count. Exiting the
 
 ## Environment variable options
 
-A string or integer option can name one environment variable with
+A string, integer, or boolean option can name one environment variable with
 `envvar="APP_JOBS"`. Explicit argv wins, including an explicit empty string;
 a nonempty environment value comes next, followed by the declared default.
 An environment value can supply a required option. If a selected integer
 environment value is invalid, CLI reports a usage error without printing the
-value. Help shows the declared defaults. Boolean flag binding is tracked
-with [zaplang-io/zap#1692](https://github.com/zaplang-io/zap/issues/1692).
+value. Boolean flags accept Click's activating values, such as `true`, `1`,
+and `yes`. Help shows the declared defaults.
+[Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables)
 
 ## Core `argparse` boundary
 

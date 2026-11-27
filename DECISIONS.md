@@ -165,8 +165,10 @@ and a selected invalid value produces a typed usage error with the variable
 and option names. Help uses declarative metadata and keeps environment
 contents and names out of the generated option rows.
 
-Boolean flags will use Click activation rules after core supports explicit
-boolean flag defaults. [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables) ·
+For boolean flags, trim surrounding whitespace and compare case-insensitively.
+`true`, `1`, `yes`, `on`, `t`, and `y` activate the flag, and other values
+leave it inactive. Core applies an explicit `--flag` even when the
+environment supplies an inactive default. [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables) ·
 [Zap flag defaults](https://github.com/zaplang-io/zap/issues/1692)
 
 ## Parser ownership

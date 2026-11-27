@@ -10,12 +10,20 @@ def configured(cli.Context ctx, str endpoint, int64 jobs, str label, str plain):
         ctx.command_name + ":" + endpoint + ":" + str(jobs) + ":" + label + ":" + plain,
     )
 
+@cli.command
+@cli.option("--verbose", bool, envvar="ZAP_CLI_ENV_VERBOSE", help="Show details.")
+def toggle(bool verbose):
+    print("verbose=" + str(verbose))
+
 def main():
     list[str] argv = sys.argv()[1:]
     if len(argv) > 0 and argv[0] == "group":
         auto app = cli.Group(name="tool")
         app.add(configured)
+        app.add(toggle)
         app.run(argv=argv[1:])
+    elif len(argv) > 0 and argv[0] == "toggle":
+        toggle.run(argv=argv[1:])
     elif len(argv) > 0 and argv[0] == "embedded":
         bool caught = False
         try:

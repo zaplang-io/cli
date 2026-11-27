@@ -353,12 +353,19 @@ def _register_parameters(
             if help != "":
                 help = help + " "
             help = help + "[default: " + default_label + "]"
+        bool has_environment = arg_name in environment
+        str fallback = environment[arg_name] if has_environment else parameter.default_value
         if parameter.kind == "bool":
-            parser.add_argument(arg_name, action="store_true", help=help)
+            bool enabled = fallback.strip().lower() in ["true", "1", "yes", "on", "t", "y"]
+            str flag_default = "true" if enabled else "false"
+            parser.add_argument(
+                arg_name,
+                action="store_true",
+                default=flag_default,
+                help=help,
+            )
         else:
             str parser_type = "int" if parameter.kind == "int64" else "str"
-            bool has_environment = arg_name in environment
-            str fallback = environment[arg_name] if has_environment else parameter.default_value
             parser.add_argument(
                 arg_name,
                 type=parser_type,
