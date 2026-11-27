@@ -9,8 +9,8 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
 first release. The framework contract below is specified in
 [#3](https://github.com/zaplang-io/cli/issues/3). The checkout exposes
-command, option, and argument declarations for a single command. Groups
-and framework exit helpers are tracked separately.
+typed command declarations, one level of subcommands, and automatic help.
+Framework exit helpers are tracked separately.
 
 ## First-release scope
 
@@ -50,6 +50,16 @@ See [Click options](https://click.palletsprojects.com/en/stable/options/),
 [Click exit codes](https://click.palletsprojects.com/en/stable/exceptions/),
 and [Typer command options](https://typer.tiangolo.com/tutorial/commands/options/).
 [DECISIONS.md](DECISIONS.md) specifies signatures, defaults, and standalone behavior.
+
+## Groups and help
+
+Register decorated commands on a `cli.Group(name="tool", help="Project tools.")`
+with `app.add(command)`, then call `app.run()`. A command's options follow its
+name. For example, `tool build --release` passes `--release` to `build`.
+`tool --help` lists commands and their summaries, and `tool build --help`
+shows the selected command's arguments, options, and defaults. Both accept
+`-h`. Missing and unknown commands are usage errors. Subcommands receive the
+full command path through optional handler context.
 
 ## Core `argparse` boundary
 
