@@ -361,3 +361,59 @@ def confirm(str text, bool default = False, bool abort = False) -> bool:
         if abort and not accepted:
             raise Abort()
         return accepted
+
+# A progress display that borrows stderr for the duration of its with block.
+struct ProgressBar:
+    int64 length
+    str label
+    bool _terminal
+    int64 completed = 0
+    bool _active = False
+
+    def __enter__(self) -> ProgressBar:
+        if self._active:
+            raise ValueError("progress bar is already active")
+        self.completed = 0
+        if self._terminal:
+            io.write(sys.stderr_fd(), "\r" + self._line())
+        self._active = True
+        return self
+
+    def __exit__(self):
+        if not self._active:
+            return
+        self._active = False
+        str tail = "\n" if self._terminal else self._line() + "\n"
+        io.write(sys.stderr_fd(), tail)
+
+    # Advance by a nonnegative amount that fits within the declared total.
+    def update(self, int64 step):
+        if not self._active:
+            raise ValueError("progress bar is not active")
+        if step < 0 or step > self.length - self.completed:
+            raise ValueError("progress update is outside the remaining total")
+        if step > 0:
+            self.completed = self.completed + step
+            if self._terminal:
+                io.write(sys.stderr_fd(), "\r" + self._line())
+
+    def _line(self) -> str:
+        int64 width = 20
+        int64 filled = width
+        if self.completed < self.length:
+            filled = min(
+                width - 1,
+                int(float(self.completed) / float(self.length) * float(width)),
+            )
+        str cells = ""
+        for i in range(width):
+            cells = cells + ("#" if i < filled else "-")
+        str prefix = self.label + " " if self.label != "" else ""
+        return prefix + "[" + cells + "] " + str(self.completed) + "/" + str(self.length)
+
+# Create a progress bar for a known total, using stderr for feedback.
+# Terminal stderr redraws in place. Redirected stderr gets one final line.
+def progressbar(int64 length, str label = "") -> ProgressBar:
+    if length < 0:
+        raise ValueError("progress length must be nonnegative")
+    return ProgressBar(length=length, label=label, _terminal=io.isatty(sys.stderr_fd()))

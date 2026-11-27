@@ -138,6 +138,22 @@ inherits core's terminal-restoration limitation. Decorator prompting is deferred
 [Click prompts](https://click.palletsprojects.com/en/stable/prompts/)
 [Typer prompts](https://typer.tiangolo.com/tutorial/prompt/)
 
+## Progress bars
+
+For [#12](https://github.com/zaplang-io/cli/issues/12), use
+`progressbar(length, label="")` with explicit `bar.update(step)` calls in a
+`with` block. The known total and each increment must be nonnegative. An
+update beyond the remaining total raises `ValueError` without changing the
+count. A zero total displays as complete. Closing an unfinished bar displays
+the actual count.
+
+Choose rendering from `io.isatty(sys.stderr_fd())`. Terminal stderr redraws
+in place and ends the line on exit. Redirected stderr receives one plain
+line on exit. The bar borrows stderr and keeps the handler's exception path
+intact when the block unwinds.
+[Click progress bars](https://click.palletsprojects.com/en/stable/api/#click.progressbar) ·
+[Zap terminal detection](https://github.com/zaplang-io/zap/issues/1685)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

@@ -86,6 +86,19 @@ Terminal restoration on normal completion and input errors follows
 `sys.getpass`. A hard terminating signal during the read can still leave
 echo disabled. [Core hidden input contract](https://github.com/zaplang-io/zap/blob/main/decisions/stdlib/1684-getpass-hidden-input.md)
 
+## Progress bars
+
+```zap
+with cli.progressbar(length=3, label="Importing") as bar:
+    for i in range(3):
+        bar.update(1)
+```
+
+Progress goes to stderr. A terminal redraws in place, and redirected stderr
+receives one plain line when the bar closes. Negative updates or updates
+beyond the total raise `ValueError` without changing the count. Exiting the
+`with` block closes the line and leaves any exception to the caller.
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
