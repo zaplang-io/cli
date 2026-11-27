@@ -77,9 +77,9 @@ def _invalid_invocations_do_not_emit_deprecation_warnings():
             "--mode=reject",
         ]
         list[str] messages = [
-            "--internal",
-            "--secret-label",
-            "--old-count",
+            "argument --internal: ignored explicit argument",
+            "argument --secret-label: expected one argument",
+            "invalid literal for int()",
             "outside range",
             "mode rejected by callback",
         ]
