@@ -154,6 +154,23 @@ intact when the block unwinds.
 [Click progress bars](https://click.palletsprojects.com/en/stable/api/#click.progressbar) ·
 [Zap terminal detection](https://github.com/zaplang-io/zap/issues/1685)
 
+## Environment variable options
+
+For [#13](https://github.com/zaplang-io/cli/issues/13), declare
+`envvar="APP_JOBS"` as named option metadata. Explicit argv has priority over
+a nonempty environment value, which takes priority over the declared default.
+An empty variable counts as unset. A nonempty value satisfies a required
+option. String values are taken verbatim. Integer values use core conversion,
+and a selected invalid value produces a typed usage error with the variable
+and option names. Help uses declarative metadata and keeps environment
+contents and names out of the generated option rows.
+
+For boolean flags, trim surrounding whitespace and compare case-insensitively.
+`true`, `1`, `yes`, `on`, `t`, and `y` activate the flag, and other values
+leave it inactive. Core applies an explicit `--flag` even when the
+environment supplies an inactive default. [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables) ·
+[Zap flag defaults](https://github.com/zaplang-io/zap/issues/1692)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

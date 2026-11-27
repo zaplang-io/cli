@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add opt-in environment variable defaults for string, integer, and boolean options.
+  [cli#13](https://github.com/zaplang-io/cli/issues/13)
+
 - Add terminal-aware progress bars with bounded updates and context-manager
   cleanup. [cli#12](https://github.com/zaplang-io/cli/issues/12)
 

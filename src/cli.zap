@@ -40,16 +40,31 @@ struct Command:
         bool standalone_mode = True,
     ) -> int64:
         list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
+        dict[str, str] environment = _environment_defaults(self._parameters)
+        ArgumentParser parser = self._parser
+        if len(environment) > 0:
+            parser = argparse.ArgumentParser(
+                prog=self.name,
+                description=self._parser.description,
+            )
+            _register_parameters(parser, self._parameters, environment)
+
         Namespace values = Namespace()
         try:
-            values = self._parser.parse_args(args)
+            values = parser.parse_args(args)
         except Exception as error:
             return _usage_failure(error, self._parser.format_help(), standalone_mode)
 
         if values.help_requested():
             print(self._parser.format_help())
             return _finish(0, standalone_mode)
-        return self._dispatch(values, [self.name], self._parser, standalone_mode)
+        return self._dispatch(
+            values,
+            [self.name],
+            self._parser,
+            standalone_mode,
+            environment,
+        )
 
     def _dispatch(
         self,
@@ -57,7 +72,21 @@ struct Command:
         list[str] path,
         ArgumentParser parser,
         bool standalone_mode,
+        dict[str, str] environment,
     ) -> int64:
+        for parameter in self._parameters:
+            if parameter.kind == "int64" and parameter.name in environment:
+                str key = _parameter_key(parameter.name)
+                if not values.has(key):
+                    try:
+                        values.get_int(key)
+                    except ValueError:
+                        str error = "environment variable " + parameter.envvar + " for " + parameter.name + " requires an integer"
+                        return _usage_failure(
+                            error,
+                            parser.format_help(),
+                            standalone_mode,
+                        )
         Context ctx = Context(command_name=self.name, command_path=path)
         auto handler = self._handler
         try:
@@ -102,14 +131,17 @@ struct Group:
         str selector = "<command>"
         auto children = parser.add_subparsers(dest=selector)
         dict[str, ArgumentParser] child_parsers = {}
+        dict[str, dict[str, str]] child_environment = {}
         for command in self._commands:
             auto child = children.add_parser(
                 command.name,
                 help=command._parser.description,
             )
             child.prog = self.name + " " + command.name
-            _register_parameters(child, command._parameters)
+            auto environment = _environment_defaults(command._parameters)
+            _register_parameters(child, command._parameters, environment)
             child_parsers[command.name] = child
+            child_environment[command.name] = environment
 
         Namespace values = Namespace()
         try:
@@ -130,17 +162,26 @@ struct Group:
             print(self._format_help(parser))
         else:
             str selected = values.get_str(selector)
-            if values.help_requested():
-                print(child_parsers[selected].format_help())
-            else:
-                for command in self._commands:
-                    if command.name == selected:
-                        return command._dispatch(
-                            values,
-                            [self.name, command.name],
-                            child_parsers[selected],
-                            standalone_mode,
+            for command in self._commands:
+                if command.name == selected:
+                    auto environment = child_environment[selected]
+                    auto child = child_parsers[selected]
+                    if len(environment) > 0:
+                        child = argparse.ArgumentParser(
+                            prog=child.prog,
+                            description=child.description,
                         )
+                        _register_parameters(child, command._parameters)
+                    if values.help_requested():
+                        print(child.format_help())
+                        break
+                    return command._dispatch(
+                        values,
+                        [self.name, command.name],
+                        child,
+                        standalone_mode,
+                        environment,
+                    )
         return _finish(0, standalone_mode)
 
     def _choices(self) -> str:
@@ -182,6 +223,7 @@ struct _Parameter:
     str default_value = ""
     bool required = False
     str help = ""
+    str envvar = ""
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -226,6 +268,7 @@ def option[T](
     Optional[T] default = None,
     bool required = False,
     str help = "",
+    str envvar = "",
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -245,6 +288,7 @@ def option[T](
         default_value=default_value,
         required=required,
         help=help,
+        envvar=envvar,
     )
     return _prepend(parameter, previous, handler)
 
@@ -268,12 +312,28 @@ def command(
         )
     return Command(name=name, _parser=parser, _handler=handler)
 
-def _register_parameters(ArgumentParser parser, list[_Parameter] parameters):
+def _parameter_key(str name) -> str:
+    return (name[2:] if name.startswith("--") else name).replace("-", "_")
+
+def _environment_defaults(list[_Parameter] parameters) -> dict[str, str]:
+    dict[str, str] result = {}
+    for parameter in parameters:
+        if parameter.envvar != "":
+            str value = os.getenv(parameter.envvar)
+            if value != "":
+                result[parameter.name] = value
+    return result
+
+def _register_parameters(
+    ArgumentParser parser,
+    list[_Parameter] parameters,
+    dict[str, str] environment = {},
+):
     dict[str, bool] destinations = {}
     for parameter in parameters:
         str arg_name = parameter.name
         bool option = arg_name.startswith("--")
-        str key = (arg_name[2:] if option else arg_name).replace("-", "_")
+        str key = _parameter_key(arg_name)
         if key == "<command>":
             raise UsageError("reserved parameter: " + key)
         if key in destinations:
@@ -289,15 +349,24 @@ def _register_parameters(ArgumentParser parser, list[_Parameter] parameters):
             if help != "":
                 help = help + " "
             help = help + "[default: " + default_label + "]"
+        bool has_environment = arg_name in environment
+        str fallback = environment[arg_name] if has_environment else parameter.default_value
         if parameter.kind == "bool":
-            parser.add_argument(arg_name, action="store_true", help=help)
+            bool enabled = fallback.strip().lower() in ["true", "1", "yes", "on", "t", "y"]
+            str flag_default = "true" if enabled else "false"
+            parser.add_argument(
+                arg_name,
+                action="store_true",
+                default=flag_default,
+                help=help,
+            )
         else:
             str parser_type = "int" if parameter.kind == "int64" else "str"
             parser.add_argument(
                 arg_name,
                 type=parser_type,
-                default=parameter.default_value,
-                required=parameter.required,
+                default=fallback,
+                required=parameter.required and not has_environment,
                 help=help,
             )
 
