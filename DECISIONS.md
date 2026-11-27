@@ -56,6 +56,16 @@ This preserves Zap's monomorphic function model (D-0067).
 [Click options](https://click.palletsprojects.com/en/stable/options/)
 [Click arguments](https://click.palletsprojects.com/en/stable/arguments/)
 
+## Group routing and help
+
+For [#5](https://github.com/zaplang-io/cli/issues/5), the group builds a core
+subparser for each command from the same metadata used for direct execution.
+Core matches the command name and validates that command's argv. CLI appends
+the first line of each command's help in registration order and includes valid
+commands in a missing or unknown command diagnostic. The registered command's
+parser receives the full program path for contextual help. Command options
+retain their metadata, including defaults, in both help entry points.
+
 ## Explicit typed context
 
 A handler may declare `cli.Context ctx` as its first parameter. The dispatcher

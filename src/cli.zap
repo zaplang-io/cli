@@ -19,6 +19,7 @@ struct Command:
     str name
     ArgumentParser _parser
     fn(Context, Namespace) _handler
+    list[_Parameter] _parameters = []
 
     # Run with explicit argv or the process arguments when argv is omitted.
     # Embedded calls return a status and can catch UsageError.
@@ -32,22 +33,114 @@ struct Command:
         try:
             values = self._parser.parse_args(args)
         except Exception as error:
-            if not standalone_mode:
-                raise UsageError(error)
-            io.write(
-                sys.stderr_fd(),
-                self._parser.format_help() + "\nError: " + error + "\n",
-            )
-            sys.exit(2)
-            return 2
+            return _usage_failure(error, self._parser.format_help(), standalone_mode)
 
-        if not values.help_requested():
-            Context ctx = Context(command_name=self.name, command_path=[self.name])
-            auto handler = self._handler
-            handler(ctx, values)
-        if standalone_mode:
-            sys.exit(0)
-        return 0
+        if values.help_requested():
+            print(self._parser.format_help())
+        else:
+            self._dispatch(values, [self.name])
+        return _finish(standalone_mode)
+
+    def _dispatch(self, Namespace values, list[str] path):
+        Context ctx = Context(command_name=self.name, command_path=path)
+        auto handler = self._handler
+        handler(ctx, values)
+
+# A named collection of commands. Registration order controls help display.
+struct Group:
+    str name
+    str help = ""
+    list[Command] _commands = []
+
+    # Register a command by its public name.
+    def add(self, Command command):
+        if command.name == "" or command.name.startswith("-"):
+            raise UsageError("invalid command name: " + command.name)
+        for existing in self._commands:
+            if existing.name == command.name:
+                raise UsageError("duplicate command: " + command.name)
+        self._commands.append(command)
+
+    # Parse argv through the core subparsers and dispatch the selected command.
+    def run(
+        self,
+        Optional[list[str]] argv = None,
+        bool standalone_mode = True,
+    ) -> int64:
+        list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
+        auto parser = argparse.ArgumentParser(prog=self.name, description=self.help)
+        # Brackets make this reserved destination distinct from handler parameters.
+        str selector = "<command>"
+        auto children = parser.add_subparsers(dest=selector)
+        dict[str, ArgumentParser] child_parsers = {}
+        for command in self._commands:
+            auto child = children.add_parser(
+                command.name,
+                help=command._parser.description,
+            )
+            child.prog = self.name + " " + command.name
+            _register_parameters(child, command._parameters)
+            child_parsers[command.name] = child
+
+        Namespace values = Namespace()
+        try:
+            values = parser.parse_args(args)
+        except Exception as error:
+            str unknown = "argument " + selector + ": invalid choice: "
+            if error.startswith(unknown):
+                error = "unknown command: " + error[len(unknown):] + self._choices()
+            return _usage_failure(error, self._format_help(parser), standalone_mode)
+
+        if not values.has(selector):
+            if not values.help_requested():
+                return _usage_failure(
+                    "missing command" + self._choices(),
+                    self._format_help(parser),
+                    standalone_mode,
+                )
+            print(self._format_help(parser))
+        else:
+            str selected = values.get_str(selector)
+            if values.help_requested():
+                print(child_parsers[selected].format_help())
+            else:
+                for command in self._commands:
+                    if command.name == selected:
+                        command._dispatch(values, [self.name, command.name])
+                        break
+        return _finish(standalone_mode)
+
+    def _choices(self) -> str:
+        if len(self._commands) == 0:
+            return " (no commands registered)"
+        list[str] names = [command.name for command in self._commands]
+        return ". Available commands: " + ", ".join(names)
+
+    def _format_help(self, ArgumentParser parser) -> str:
+        str help = parser.format_help()
+        if len(self._commands) > 0:
+            help = help + "\n\ncommands:"
+        for command in self._commands:
+            str summary = command._parser.description
+            int64 newline = summary.find("\n")
+            if newline >= 0:
+                summary = summary[:newline]
+            help = help + "\n  " + command.name
+            if summary != "":
+                help = help + "  " + summary
+        return help
+
+def _finish(bool standalone_mode) -> int64:
+    if standalone_mode:
+        sys.exit(0)
+    return 0
+
+def _usage_failure(str message, str usage, bool standalone_mode) -> int64:
+    if not standalone_mode:
+        raise UsageError(message)
+    io.write(sys.stderr_fd(), usage + "\nError: " + message + "\n")
+    sys.exit(2)
+    return 2
 
 # Metadata is collected before the parser is constructed. Every outer decorator
 # receives the declaration rather than another function value.
@@ -134,26 +227,44 @@ def command(
     auto parser = argparse.ArgumentParser(prog=name, description=help)
     if previous.is_some():
         auto declaration = previous.unwrap()
-        dict[str, bool] destinations = {}
-        for parameter in declaration.parameters:
-            str arg_name = parameter.name
-            str key = (arg_name[2:] if arg_name.startswith("--") else arg_name).replace(
-                "-",
-                "_",
-            )
-            if key in destinations:
-                raise UsageError("duplicate parameter: " + key)
-            destinations[key] = True
-            if parameter.kind == "bool":
-                parser.add_argument(arg_name, action="store_true", help=parameter.help)
-            else:
-                str parser_type = "int" if parameter.kind == "int64" else "str"
-                parser.add_argument(
-                    arg_name,
-                    type=parser_type,
-                    default=parameter.default_value,
-                    required=parameter.required,
-                    help=parameter.help,
-                )
-        return Command(name=name, _parser=parser, _handler=declaration.handler)
+        _register_parameters(parser, declaration.parameters)
+        return Command(
+            name=name,
+            _parser=parser,
+            _handler=declaration.handler,
+            _parameters=declaration.parameters,
+        )
     return Command(name=name, _parser=parser, _handler=handler)
+
+def _register_parameters(ArgumentParser parser, list[_Parameter] parameters):
+    dict[str, bool] destinations = {}
+    for parameter in parameters:
+        str arg_name = parameter.name
+        bool option = arg_name.startswith("--")
+        str key = (arg_name[2:] if option else arg_name).replace("-", "_")
+        if key == "<command>":
+            raise UsageError("reserved parameter: " + key)
+        if key in destinations:
+            raise UsageError("duplicate parameter: " + key)
+        destinations[key] = True
+        str help = parameter.help
+        if option and not parameter.required:
+            str default_label = parameter.default_value
+            if parameter.kind == "bool":
+                default_label = "False"
+            elif default_label == "":
+                default_label = '""'
+            if help != "":
+                help = help + " "
+            help = help + "[default: " + default_label + "]"
+        if parameter.kind == "bool":
+            parser.add_argument(arg_name, action="store_true", help=help)
+        else:
+            str parser_type = "int" if parameter.kind == "int64" else "str"
+            parser.add_argument(
+                arg_name,
+                type=parser_type,
+                default=parameter.default_value,
+                required=parameter.required,
+                help=help,
+            )

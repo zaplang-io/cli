@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add named groups, subcommand dispatch, and automatic group and command help.
+  [cli#5](https://github.com/zaplang-io/cli/issues/5)
+
 - Add Click-style command declarations, typed options and positional
   arguments, optional handler context, and typed usage errors.
   [cli#4](https://github.com/zaplang-io/cli/issues/4)
