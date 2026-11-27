@@ -2,8 +2,11 @@ import cli
 
 @test
 def _hidden_options_bind_but_stay_out_of_help_and_usage():
-    for entry in [[], ["group", "switch"]]:
-        list[str] start = ["./option_metadata_commands", *entry]
+    list[list[str]] entries = [
+        ["./option_metadata_commands"],
+        ["./option_metadata_commands", "group", "switch"],
+    ]
+    for start in entries:
         auto code, out, err = process.run(
             [*start, "--internal", "--secret-label=chosen"],
         )
@@ -31,8 +34,11 @@ def _hidden_options_bind_but_stay_out_of_help_and_usage():
 
 @test
 def _deprecated_options_warn_once_per_explicit_option_in_declaration_order():
-    for entry in [[], ["group", "switch"]]:
-        list[str] start = ["./option_metadata_commands", *entry]
+    list[list[str]] entries = [
+        ["./option_metadata_commands"],
+        ["./option_metadata_commands", "group", "switch"],
+    ]
+    for start in entries:
         dict[str, str] environment = {"ZAP_CLI_LEGACY_MODE": "environment"}
         auto default_code, default_out, default_err = process.run(start)
         assert default_code == 0 and default_out == "current:fallback:2:False:private default:False\n"
@@ -57,8 +63,12 @@ def _deprecated_options_warn_once_per_explicit_option_in_declaration_order():
 
 @test
 def _invalid_invocations_do_not_emit_deprecation_warnings():
-    for entry in [[], ["group", "switch"]]:
-        list[str] start = ["./option_metadata_commands", *entry, "--legacy-mode=old"]
+    list[list[str]] entries = [
+        ["./option_metadata_commands"],
+        ["./option_metadata_commands", "group", "switch"],
+    ]
+    for entry in entries:
+        list[str] start = [*entry, "--legacy-mode=old"]
         list[str] invalid = [
             "--internal=true",
             "--secret-label",
