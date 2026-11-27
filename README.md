@@ -120,6 +120,18 @@ produce `cli.UsageError` before the command handler runs. A typed
 `callback=normalize` can validate a parameter or return its replacement.
 Callbacks run in declaration order after built-in validation.
 
+## Hidden and deprecated options
+
+Use `hidden=True` to retain an option for scripts while omitting it from
+generated usage and help. Use `deprecated=True` for the standard warning or
+`deprecated="Use --mode instead."` to append a migration message. Visible
+deprecated options are marked `(deprecated)` in help.
+
+CLI writes one stderr warning per explicitly supplied deprecated option after
+parsing and validation succeed, including for hidden options. Help,
+environment values, and defaults are silent. Deprecated options cannot be required.
+[Click options API](https://click.palletsprojects.com/en/stable/api/#click.Option)
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from

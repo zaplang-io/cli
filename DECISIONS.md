@@ -191,6 +191,27 @@ propagate. Help skips callbacks.
 [Zap Namespace setters](https://github.com/zaplang-io/zap/issues/1698)
 [Click parameter types](https://click.palletsprojects.com/en/stable/parameter-types/)
 
+## Hidden and deprecated options
+
+For [#15](https://github.com/zaplang-io/cli/issues/15), keep visibility and
+deprecation on the option declaration. Forward `hidden=True` to core
+`ArgumentParser.add_argument` in both direct and grouped parsers. Core retains
+the option for parsing and omits its synopsis and row from generated help.
+Rich help and completion can filter on the same CLI declaration metadata.
+[Zap parser visibility](https://github.com/zaplang-io/zap/issues/1702)
+
+Like Click, `deprecated=True` selects the standard warning and a nonempty
+string appends migration guidance. `False` and the empty string disable
+deprecation. Visible deprecated options get a `(deprecated)` help annotation.
+A deprecated option cannot be required.
+[Click options API](https://click.palletsprojects.com/en/stable/api/#click.Option)
+
+After parsing, built-in validation, and callbacks succeed, use
+`Namespace.has` to emit one warning per explicitly supplied deprecated
+option in declaration order, before the handler runs. Repeated argv spellings
+warn once. Hidden options still warn on explicit use. Omission, defaults,
+environment values, failed validation, and help are silent.
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

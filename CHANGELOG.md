@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add hidden options and Click-style deprecation warnings for explicit argv use.
+  [cli#15](https://github.com/zaplang-io/cli/issues/15)
+
 - Add string choices, inclusive integer bounds, and typed transforming
   parameter callbacks.
   [cli#14](https://github.com/zaplang-io/cli/issues/14)
