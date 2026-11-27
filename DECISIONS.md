@@ -89,6 +89,9 @@ and retrieving them.
 
 ## Run boundary and exits
 
+The implementation is tracked in [#6](https://github.com/zaplang-io/cli/issues/6).
+The command handler boundary applies the same mapping to direct and group dispatch.
+
 `Command.run(argv=..., standalone_mode=True)` and `Group.run` share the same
 behavior. Omitted argv means `sys.argv()[1:]`. An explicit empty list means an
 empty invocation. In standalone mode the framework exits the process after

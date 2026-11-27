@@ -9,8 +9,8 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
 first release. The framework contract below is specified in
 [#3](https://github.com/zaplang-io/cli/issues/3). The checkout exposes
-typed command declarations, one level of subcommands, and automatic help.
-Framework exit helpers are tracked separately.
+typed command declarations, one level of subcommands, automatic help, and
+framework exit helpers.
 
 ## First-release scope
 
@@ -60,6 +60,16 @@ name. For example, `tool build --release` passes `--release` to `build`.
 shows the selected command's arguments, options, and defaults. Both accept
 `-h`. Missing and unknown commands are usage errors. Subcommands receive the
 full command path through optional handler context.
+
+## Exit and usage errors
+
+Raise `cli.UsageError(message)` to report invalid input, `cli.Exit(code)` to
+stop with a specific status, or `cli.Abort()` to abort. In standalone mode,
+usage errors write usage and a diagnostic to stderr and exit with status 2.
+Abort writes `Aborted.` to stderr and exits with status 1. Explicit exits
+write nothing. Embedded callers can use `run(standalone_mode=False)` to
+receive exit statuses and catch the typed usage and abort exceptions.
+Unrelated handler exceptions propagate in either mode.
 
 ## Core `argparse` boundary
 
