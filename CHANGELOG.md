@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add declared string choices and inclusive integer bounds.
+- Add string choices, inclusive integer bounds, and typed transforming
+  parameter callbacks.
   [cli#14](https://github.com/zaplang-io/cli/issues/14)
 
 - Add opt-in environment variable defaults for string, integer, and boolean options.

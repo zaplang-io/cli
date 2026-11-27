@@ -155,3 +155,54 @@ def _declared_defaults_obey_constraints_in_direct_and_group_dispatch():
             assert error == "--jobs is outside range >= 1"
             caught_bounds = True
         assert caught_bounds
+
+@test
+def _typed_callbacks_replace_argv_environment_and_defaults_in_declaration_order():
+    list[list[str]] entries = [["rewrite"], ["group", "rewrite"]]
+    str callbacks = "callback: name\ncallback: jobs\ncallback: flag\ncallback: level\n"
+    dict[str, str] environment = {
+        "ZAP_CLI_CALLBACK_NAME": "from env",
+        "ZAP_CLI_CALLBACK_JOBS": "5",
+        "ZAP_CLI_CALLBACK_FLAG": "yes",
+    }
+    for entry in entries:
+        list[str] start = ["./validation_commands", *entry]
+        auto default_code, default_out, default_err = process.run([*start, "1"])
+        assert default_err == ""
+        assert default_code == 0 and default_out == callbacks + "handler: DEFAULT:5:True:0\n"
+
+        auto env_code, env_out, env_err = process.run([*start, "2"], env=environment)
+        assert env_err == ""
+        assert env_code == 0 and env_out == callbacks + "handler: FROM ENV:6:False:1\n"
+
+        auto argv_code, argv_out, argv_err = process.run(
+            [*start, "--flag", "3", "--jobs=7", "--name=argv"],
+            env=environment,
+        )
+        assert argv_err == ""
+        assert argv_code == 0 and argv_out == callbacks + "handler: ARGV:8:False:2\n"
+
+@test
+def _help_and_builtin_failures_skip_callbacks_and_callback_errors_stop_dispatch():
+    list[list[str]] entries = [["rewrite"], ["group", "rewrite"]]
+    for entry in entries:
+        list[str] start = ["./validation_commands", *entry]
+        auto help_code, help_out, help_err = process.run([*start, "--help"])
+        assert help_err == ""
+        assert help_code == 0 and help_out.find("Rewrite typed parameters.") >= 0
+        assert help_out.find("callback:") < 0
+
+        auto bounds_code, bounds_out, bounds_err = process.run([*start, "4"])
+        assert bounds_code == 2 and bounds_out == ""
+        assert bounds_err.find("level is outside range") >= 0
+
+        auto code, out, err = process.run([*start, "0", "--jobs=13"])
+        assert code == 2 and out == "callback: name\ncallback: jobs\n"
+        assert err.find("Error: jobs cannot be thirteen") >= 0
+
+        auto unrelated_code, unrelated_out, unrelated_err = process.run(
+            [*start, "0", "--jobs=17"],
+        )
+        assert unrelated_code == 1 and unrelated_out == "callback: name\ncallback: jobs\n"
+        assert unrelated_err.find("Uncaught exception: callback broke") >= 0
+        assert unrelated_err.find("usage:") < 0

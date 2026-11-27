@@ -79,6 +79,10 @@ struct Command:
         try:
             for parameter in self._parameters:
                 _validate_parameter(parameter, values, parameter.name in environment)
+            for parameter in self._parameters:
+                if parameter.transform.is_some():
+                    fn(Namespace) transform = parameter.transform.unwrap()
+                    transform(values)
             handler(ctx, values)
         except UsageError as error:
             if not standalone_mode:
@@ -216,6 +220,7 @@ struct _Parameter:
     list[str] choices = []
     Optional[int64] minimum = None
     Optional[int64] maximum = None
+    Optional[fn(Namespace)] transform = None
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -245,6 +250,7 @@ def argument[T](
     list[str] choices = [],
     Optional[int64] min = None,
     Optional[int64] max = None,
+    Optional[fn(T) -> T] callback = None,
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if name == "" or name.startswith("-"):
@@ -259,6 +265,7 @@ def argument[T](
         choices=choices,
         minimum=min,
         maximum=max,
+        transform=_parameter_transform(name, kind, callback),
     )
     return _prepend(parameter, previous, handler)
 
@@ -276,6 +283,7 @@ def option[T](
     list[str] choices = [],
     Optional[int64] min = None,
     Optional[int64] max = None,
+    Optional[fn(T) -> T] callback = None,
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -300,6 +308,7 @@ def option[T](
         choices=choices,
         minimum=min,
         maximum=max,
+        transform=_parameter_transform(name, kind, callback),
     )
     return _prepend(parameter, previous, handler)
 
@@ -334,6 +343,26 @@ def _environment_defaults(list[_Parameter] parameters) -> dict[str, str]:
             if value != "":
                 result[parameter.name] = value
     return result
+
+def _apply_parameter_callback[T](str key, fn(T) -> T callback, Namespace values):
+    if reflect.type_info(T).name == "str":
+        values.set_str(key, callback(values.get_str(key)))
+    elif reflect.type_info(T).name == "int64":
+        values.set_int(key, callback(values.get_int(key)))
+    elif reflect.type_info(T).name == "bool":
+        values.set_flag(key, callback(values.get_flag(key)))
+
+def _parameter_transform[T](
+    str name,
+    Type[T] kind,
+    Optional[fn(T) -> T] callback,
+) -> Optional[fn(Namespace)]:
+    if callback.is_none():
+        return None
+    str key = _parameter_key(name)
+    fn(T) -> T transform = callback.unwrap()
+    fn(Namespace) apply = lambda values: _apply_parameter_callback[T](key, transform, values)
+    return Optional.Some(apply)
 
 def _check_constraints(
     str name,

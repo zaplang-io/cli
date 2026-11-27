@@ -116,7 +116,9 @@ Use `choices=["json", "text"]` on text parameters and `min=1` or `max=64`
 on integer parameters. Choices are case-sensitive, and bounds are inclusive.
 Help lists each parameter's constraints. Values from argv, environment
 variables, and declared defaults all pass through validation. Invalid values
-produce `cli.UsageError` before the command handler runs.
+produce `cli.UsageError` before the command handler runs. A typed
+`callback=normalize` can validate a parameter or return its replacement.
+Callbacks run in declaration order after built-in validation.
 
 ## Core `argparse` boundary
 
