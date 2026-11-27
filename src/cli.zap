@@ -275,10 +275,6 @@ def option[T](
         raise UsageError("invalid long option name: " + name)
     str default_value = str(default.unwrap()) if default.is_some() else ""
     if type_name == "bool":
-        if envvar != "":
-            raise UsageError(
-                "boolean environment defaults require core argparse support: " + name,
-            )
         if required or default_value == "True":
             raise UsageError("boolean flag requires a False default: " + name)
     elif type_name == "int64" or type_name == "str":
