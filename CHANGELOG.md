@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add terminal-aware progress bars with bounded updates and context-manager
+  cleanup. [cli#12](https://github.com/zaplang-io/cli/issues/12)
+
 - Add typed visible and hidden prompts and confirmation with retries and
   EOF-to-abort handling.
   [cli#11](https://github.com/zaplang-io/cli/issues/11)
