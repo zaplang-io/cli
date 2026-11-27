@@ -24,7 +24,7 @@ cli = { path = "cli" }
 MANIFEST
 "$zap" zenv create --no-venv
 cp -R "$root/tests" tests
-for fixture in declared_commands group_commands error_commands; do
+for fixture in declared_commands group_commands error_commands prompt_commands; do
     ZAP_ZENV="$scratch/zenv" "$zap" build "tests/fixtures/$fixture.zap" -o "$scratch/$fixture"
 done
 ZAP_ZENV="$scratch/zenv" "$zap" test tests/

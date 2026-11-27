@@ -112,6 +112,26 @@ same dispatch contract with native status assertions and typed error checks.
 [Click exit codes and standalone mode](https://click.palletsprojects.com/en/stable/exceptions/)
 [Typer termination](https://typer.tiangolo.com/tutorial/terminating/)
 
+## Interactive prompts
+
+For [#11](https://github.com/zaplang-io/cli/issues/11), keep the prompt label
+and Zap type positional, with the optional typed default named. Support
+`str` and `int64`. An empty line selects a supplied default and otherwise
+retries. String responses are returned verbatim. Integer responses use Zap's
+`int` conversion rules and retry on `ValueError`. Use stdout for prompts and
+retry diagnostics. Dispatch translates `Abort()` to status 1 and stderr in
+standalone mode. EOF raises `Abort()` even when a default is supplied. Visible
+input retains the host's signal behavior.
+
+`confirm(text, default=False, abort=False)` accepts case-insensitive
+`y`/`yes` and `n`/`no` after stripping surrounding whitespace. An empty line
+selects the default and an invalid answer retries. A decline raises
+`Abort()` when `abort=True`. Hidden manual input is in scope and depends on
+[zaplang-io/zap#1684](https://github.com/zaplang-io/zap/issues/1684). Decorator
+prompting is deferred.
+[Click prompts](https://click.palletsprojects.com/en/stable/prompts/)
+[Typer prompts](https://typer.tiangolo.com/tutorial/prompt/)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

@@ -300,3 +300,56 @@ def _register_parameters(ArgumentParser parser, list[_Parameter] parameters):
                 required=parameter.required,
                 help=help,
             )
+
+# Read one visible response and translate EOF to the framework's abort path.
+def _prompt_line(str text) -> str:
+    try:
+        return input(text)
+    except EOFError:
+        raise Abort()
+
+def _convert_prompt_value[T](Type[T] kind, str value) -> T:
+    if reflect.type_info(T).name == "int64":
+        return int(value)
+    elif reflect.type_info(T).name == "str":
+        return value
+    raise UsageError("prompt supports str and int64")
+
+# Prompt on stdout for text or an integer. Empty input selects the optional
+# default. A malformed value prints a diagnostic and retries.
+def prompt[T](str text, Type[T] kind, Optional[T] default = None) -> T:
+    str type_name = reflect.type_info(T).name
+    if type_name != "str" and type_name != "int64":
+        raise UsageError("prompt supports str and int64")
+    str label = text
+    if default.is_some():
+        label = label + " [" + str(default.unwrap()) + "]"
+    label = label + ": "
+    while True:
+        str response = _prompt_line(label)
+        if response == "":
+            if default.is_some():
+                return default.unwrap()
+            print("Error: A response is required.")
+        else:
+            try:
+                return _convert_prompt_value(kind, response)
+            except ValueError:
+                print("Error: Enter a valid integer.")
+
+# Read a case-insensitive yes/no answer and optionally abort on a decline.
+def confirm(str text, bool default = False, bool abort = False) -> bool:
+    str label = text + (" [Y/n]: " if default else " [y/N]: ")
+    while True:
+        str response = _prompt_line(label).strip().lower()
+        bool accepted = False
+        if response == "":
+            accepted = default
+        elif response == "y" or response == "yes":
+            accepted = True
+        elif response != "n" and response != "no":
+            print("Error: Enter yes or no.")
+            continue
+        if abort and not accepted:
+            raise Abort()
+        return accepted

@@ -71,6 +71,15 @@ write nothing. Embedded callers can use `run(standalone_mode=False)` to
 receive exit statuses and catch the typed usage and abort exceptions.
 Unrelated handler exceptions propagate in either mode.
 
+## Interactive prompts
+
+Handlers can use `cli.prompt("Target", str, default="staging")` or
+`cli.prompt("Retries", int64, default=3)` to read visible input from stdin.
+Prompts and retry messages go to stdout. `cli.confirm("Continue?", abort=True)`
+uses a default of `False` and raises `cli.Abort()` on a decline. EOF aborts
+even when a default was supplied. Hidden input depends on a core terminal
+primitive. [zaplang-io/zap#1684](https://github.com/zaplang-io/zap/issues/1684)
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
