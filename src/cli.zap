@@ -83,6 +83,12 @@ struct Command:
                 if parameter.transform.is_some():
                     fn(Namespace) transform = parameter.transform.unwrap()
                     transform(values)
+            for parameter in self._parameters:
+                if parameter.deprecation != "" and values.has(_parameter_key(parameter.name)):
+                    io.write(
+                        sys.stderr_fd(),
+                        "Warning: " + parameter.deprecation + "\n",
+                    )
             handler(ctx, values)
         except UsageError as error:
             if not standalone_mode:
@@ -221,6 +227,8 @@ struct _Parameter:
     Optional[int64] minimum = None
     Optional[int64] maximum = None
     Optional[fn(Namespace)] transform = None
+    bool hidden = False
+    str deprecation = ""
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -270,8 +278,9 @@ def argument[T](
     return _prepend(parameter, previous, handler)
 
 # Declare a long option with a typed default, or mark a value option required.
-# A bool option is a zero-arity flag that defaults to False.
-def option[T](
+# A bool option is a zero-arity flag that defaults to False. Hidden options
+# still parse. Deprecated options accept True or a custom message.
+def option[T, D](
     str name,
     Type[T] kind,
     Optional[_Declaration] previous = None,
@@ -284,6 +293,8 @@ def option[T](
     Optional[int64] min = None,
     Optional[int64] max = None,
     Optional[fn(T) -> T] callback = None,
+    bool hidden = False,
+    D deprecated = False,
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -297,6 +308,9 @@ def option[T](
             raise UsageError("provide a default or required=True for " + name)
     else:
         raise UsageError("unsupported option type for " + name + ": " + type_name)
+    str deprecation = _option_deprecation(name, deprecated)
+    if deprecation != "" and required:
+        raise UsageError("deprecated option cannot be required: " + name)
     _check_constraints(name, type_name, choices, min, max)
     auto parameter = _Parameter(
         name=name,
@@ -309,8 +323,18 @@ def option[T](
         minimum=min,
         maximum=max,
         transform=_parameter_transform(name, kind, callback),
+        hidden=hidden,
+        deprecation=deprecation,
     )
     return _prepend(parameter, previous, handler)
+
+def _option_deprecation[D](str name, D deprecated) -> str:
+    str message = "Option " + name + " is deprecated."
+    if reflect.type_info(D).name == "bool":
+        return message if deprecated else ""
+    elif reflect.type_info(D).name == "str":
+        return message + " " + deprecated if deprecated != "" else ""
+    raise UsageError("deprecated requires bool or str for " + name)
 
 # Finish the declaration and bind the resulting Command under the function name.
 # Zap provides the original declaration name when name is omitted.
@@ -442,6 +466,8 @@ def _register_parameters(
             help = (help + " " if help != "" else "") + "[choices: " + ", ".join(parameter.choices) + "]"
         if parameter.minimum.is_some() or parameter.maximum.is_some():
             help = (help + " " if help != "" else "") + "[range: " + _range_label(parameter) + "]"
+        if parameter.deprecation != "":
+            help = (help + " " if help != "" else "") + "(deprecated)"
         bool has_environment = arg_name in environment
         str fallback = environment[arg_name] if has_environment else parameter.default_value
         if parameter.kind == "bool":
@@ -452,6 +478,7 @@ def _register_parameters(
                 action="store_true",
                 default=flag_default,
                 help=help,
+                hidden=parameter.hidden,
             )
         else:
             str parser_type = "int" if parameter.kind == "int64" else "str"
@@ -462,6 +489,7 @@ def _register_parameters(
                 required=parameter.required and not has_environment,
                 choices=parameter.choices,
                 help=help,
+                hidden=parameter.hidden,
             )
 
 # Read one response and translate EOF to the framework's abort path.
