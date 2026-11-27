@@ -14,6 +14,17 @@ struct Context:
 struct UsageError:
     str message
 
+# End the command with an explicit process status.
+@exception
+struct Exit:
+    int64 code = 0
+
+# End the command as an abort.
+@exception
+struct Abort:
+    pass
+
+
 # A configured parser and the typed callback synthesized for its command.
 struct Command:
     str name
@@ -37,14 +48,32 @@ struct Command:
 
         if values.help_requested():
             print(self._parser.format_help())
-        else:
-            self._dispatch(values, [self.name])
-        return _finish(standalone_mode)
+            return _finish(0, standalone_mode)
+        return self._dispatch(values, [self.name], self._parser, standalone_mode)
 
-    def _dispatch(self, Namespace values, list[str] path):
+    def _dispatch(
+        self,
+        Namespace values,
+        list[str] path,
+        ArgumentParser parser,
+        bool standalone_mode,
+    ) -> int64:
         Context ctx = Context(command_name=self.name, command_path=path)
         auto handler = self._handler
-        handler(ctx, values)
+        try:
+            handler(ctx, values)
+        except UsageError as error:
+            if not standalone_mode:
+                raise
+            return _usage_failure(error, parser.format_help(), standalone_mode)
+        except Exit as error:
+            return _finish(error.code, standalone_mode)
+        except Abort:
+            if not standalone_mode:
+                raise
+            io.write(sys.stderr_fd(), "Aborted.\n")
+            return _finish(1, standalone_mode)
+        return _finish(0, standalone_mode)
 
 # A named collection of commands. Registration order controls help display.
 struct Group:
@@ -106,9 +135,13 @@ struct Group:
             else:
                 for command in self._commands:
                     if command.name == selected:
-                        command._dispatch(values, [self.name, command.name])
-                        break
-        return _finish(standalone_mode)
+                        return command._dispatch(
+                            values,
+                            [self.name, command.name],
+                            child_parsers[selected],
+                            standalone_mode,
+                        )
+        return _finish(0, standalone_mode)
 
     def _choices(self) -> str:
         if len(self._commands) == 0:
@@ -130,17 +163,16 @@ struct Group:
                 help = help + "  " + summary
         return help
 
-def _finish(bool standalone_mode) -> int64:
+def _finish(int64 code, bool standalone_mode) -> int64:
     if standalone_mode:
-        sys.exit(0)
-    return 0
+        sys.exit(code)
+    return code
 
 def _usage_failure(str message, str usage, bool standalone_mode) -> int64:
     if not standalone_mode:
         raise UsageError(message)
     io.write(sys.stderr_fd(), usage + "\nError: " + message + "\n")
-    sys.exit(2)
-    return 2
+    return _finish(2, standalone_mode)
 
 # Metadata is collected before the parser is constructed. Every outer decorator
 # receives the declaration rather than another function value.

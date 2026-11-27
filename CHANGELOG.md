@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add typed `Exit` and `Abort` and share their status mapping with usage
+  errors across command and group dispatch.
+  [cli#6](https://github.com/zaplang-io/cli/issues/6)
+
 - Add named groups, subcommand dispatch, and automatic group and command help.
   [cli#5](https://github.com/zaplang-io/cli/issues/5)
 
