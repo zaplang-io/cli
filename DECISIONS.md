@@ -177,7 +177,14 @@ For [#14](https://github.com/zaplang-io/cli/issues/14), `choices=` adds
 case-sensitive string choices to an option or positional declaration, and
 `min=`/`max=` add inclusive bounds to integer parameters. Core matches
 argv choices. CLI checks range bounds with the typed integer value and
-renders the declared constraints in help.
+renders the declared constraints in help. Apply these constraints to the
+selected value from argv, environment variables, or a declared default.
+
+Typed callbacks validate and transform the resolved value through a
+`fn(T) -> T` contract after built-in constraints and before the command
+handler. Argv, environment, and defaults all use this pipeline. Writing a
+transformed result back through the parser's public API depends on
+[zaplang-io/zap#1698](https://github.com/zaplang-io/zap/issues/1698).
 [Click parameter types](https://click.palletsprojects.com/en/stable/parameter-types/)
 
 ## Parser ownership

@@ -80,3 +80,78 @@ def _invalid_constraint_declarations_raise_typed_usage_errors():
         assert error == "bounds require int64 for --label"
         invalid_bound_type = True
     assert invalid_bound_type
+
+@test
+def _selected_environment_values_obey_the_same_constraints_without_disclosure():
+    list[list[str]] entries = [[], ["group", "render"]]
+    for entry in entries:
+        list[str] start = ["./validation_commands", *entry]
+        dict[str, str] happy = {
+            "ZAP_CLI_VALIDATION_FORMAT": "text",
+            "ZAP_CLI_VALIDATION_JOBS": "64",
+        }
+        auto ok_code, ok_out, ok_err = process.run([*start, "3"], env=happy)
+        assert ok_err == ""
+        assert ok_code == 0 and ok_out == "text:64:3\n"
+
+        dict[str, str] bad = {
+            "ZAP_CLI_VALIDATION_FORMAT": "private-choice",
+            "ZAP_CLI_VALIDATION_JOBS": "99993",
+        }
+        auto choice_code, choice_out, choice_err = process.run([*start, "3"], env=bad)
+        assert choice_code == 2 and choice_out == ""
+        assert choice_err.find("--format must be one of json, text") >= 0
+        assert choice_err.find("private-choice") < 0
+
+        auto bound_code, bound_out, bound_err = process.run(
+            [*start, "--format=text", "3"],
+            env=bad,
+        )
+        assert bound_code == 2 and bound_out == ""
+        assert bound_err.find("--jobs is outside range 1..64") >= 0
+        assert bound_err.find("99993") < 0
+
+        auto override_code, override_out, override_err = process.run(
+            [*start, "--format=text", "--jobs=1", "3"],
+            env=bad,
+        )
+        assert override_err == ""
+        assert override_code == 0 and override_out == "text:1:3\n"
+
+@test
+def _declared_defaults_obey_constraints_in_direct_and_group_dispatch():
+    auto choice = cli.option(
+        "--format",
+        str,
+        choices=["json"],
+        default="text",
+        handler=_no_dispatch,
+    )
+    auto bounds = cli.option("--jobs", int64, min=1, default=0, handler=_no_dispatch)
+    auto format = cli.command(name="format", previous=choice)
+    auto jobs = cli.command(name="jobs", previous=bounds)
+    auto app = cli.Group(name="tool")
+    app.add(format)
+    app.add(jobs)
+    for grouped in [False, True]:
+        bool caught_choice = False
+        try:
+            if grouped:
+                app.run(argv=["format"], standalone_mode=False)
+            else:
+                format.run(argv=[], standalone_mode=False)
+        except cli.UsageError as error:
+            assert error == "--format must be one of json"
+            caught_choice = True
+        assert caught_choice
+
+        bool caught_bounds = False
+        try:
+            if grouped:
+                app.run(argv=["jobs"], standalone_mode=False)
+            else:
+                jobs.run(argv=[], standalone_mode=False)
+        except cli.UsageError as error:
+            assert error == "--jobs is outside range >= 1"
+            caught_bounds = True
+        assert caught_bounds
