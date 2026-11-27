@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add Click-style command declarations, typed options and positional
+  arguments, optional handler context, and typed usage errors.
+  [cli#4](https://github.com/zaplang-io/cli/issues/4)
+
 - Specify the first-release CLI contract, document its core parser boundary and
   threat model, and link the core parser and decorator dependencies.
   [cli#3](https://github.com/zaplang-io/cli/issues/3)

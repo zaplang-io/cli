@@ -8,8 +8,9 @@ Declarative command-line framework for [Zap](https://github.com/zaplang-io/zap) 
 
 The [Tier-1 epic](https://github.com/zaplang-io/cli/issues/2) tracks the
 first release. The framework contract below is specified in
-[#3](https://github.com/zaplang-io/cli/issues/3). The checkout currently
-contains the package scaffold. The example describes the intended API.
+[#3](https://github.com/zaplang-io/cli/issues/3). The checkout exposes
+command, option, and argument declarations for a single command. Groups
+and framework exit helpers are tracked separately.
 
 ## First-release scope
 
@@ -26,9 +27,7 @@ def greet(cli.Context ctx, int64 count, bool shout, str name):
         print(greeting)
 
 def main():
-    auto app = cli.Group(name="tool", help="Example commands.")
-    app.add(greet)
-    app.run()
+    greet.run()
 ```
 
 `greet` is a `cli.Command`, so it can also be run directly with
@@ -72,10 +71,10 @@ presentation, and the status and I/O at the run boundary.
 Zap core now rejects malformed option values and honors `--` as the
 end-of-options separator. See
 [zaplang-io/zap#1512](https://github.com/zaplang-io/zap/pull/1512).
-Returning decorators can bind command objects on local struct receivers.
-The `import cli; @cli.command` package API requires imported-module decorator
-resolution in [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519),
-which blocks [#4](https://github.com/zaplang-io/cli/issues/4).
+The innermost decorator receives a monomorphic typed callback through Zap's
+explicit context adapter seam. Each subsequent decorator receives the
+accumulated declaration, and `command` creates the parser after collecting
+all parameters.
 Core accepts one name per argument and has no variadic positional argument
 API.
 

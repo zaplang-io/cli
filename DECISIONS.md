@@ -20,11 +20,21 @@ types match the declarations.
 [Click option names](https://click.palletsprojects.com/en/stable/options/)
 [Typer commands](https://typer.tiangolo.com/tutorial/commands/)
 
-A dotted decorator can bind its returned object when core resolves the
-receiver as a local struct and the method declares a return type. Stacks
-compose bottom-up. The package form requires the same semantics for imported
-module functions. See [zaplang-io/zap#1515](https://github.com/zaplang-io/zap/pull/1515)
-and [zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519).
+A returning dotted decorator binds the returned object under the decorated
+name. Core supports imported module functions and adapts argv-sourced scalar
+parameters by name through `fn(Namespace)`.
+[zaplang-io/zap#1519](https://github.com/zaplang-io/zap/issues/1519) ·
+[zaplang-io/zap#1544](https://github.com/zaplang-io/zap/issues/1544)
+
+The innermost factory requests the literal `fn(Context, Namespace)` adapter
+seam. When the handler omits context, Zap synthesizes an adapter of that same
+declared type which ignores the context. Subsequent decorators receive a
+declaration containing the existing callback and the ordered parameter
+metadata. A separate factory parameter accepts that composed declaration,
+and the outer command factory registers the metadata with core `argparse`.
+This preserves Zap's monomorphic function model (D-0067).
+[Explicit context adapter](https://github.com/zaplang-io/zap/issues/1621) ·
+[Callback storage decision](https://github.com/zaplang-io/zap/issues/1674)
 
 ## Signatures and defaults
 
@@ -54,6 +64,8 @@ supplies it directly. `command_name` is the selected command's name and
 For example, running `tool build` produces `["tool", "build"]`. A directly run
 command has a one-element path. This first slice uses a concrete context type
 for invocation metadata. Application-specific context storage is deferred.
+Core passes explicit context through the `fn(Context, Namespace)` adapter seam.
+[zaplang-io/zap#1621](https://github.com/zaplang-io/zap/issues/1621)
 [Click contexts](https://click.palletsprojects.com/en/stable/commands-and-groups/#context)
 [Typer context](https://typer.tiangolo.com/tutorial/commands/context/)
 
