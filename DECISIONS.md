@@ -112,6 +112,32 @@ same dispatch contract with native status assertions and typed error checks.
 [Click exit codes and standalone mode](https://click.palletsprojects.com/en/stable/exceptions/)
 [Typer termination](https://typer.tiangolo.com/tutorial/terminating/)
 
+## Interactive prompts
+
+For [#11](https://github.com/zaplang-io/cli/issues/11), keep the prompt label
+and Zap type positional, with the optional typed default named. Support
+`str` and `int64`. An empty line selects a supplied default and otherwise
+retries. String responses are returned verbatim. Integer responses use Zap's
+`int` conversion rules and retry on `ValueError`. Use stdout for prompts and
+retry diagnostics. Dispatch translates `Abort()` to status 1 and stderr in
+standalone mode. EOF raises `Abort()` even when a default is supplied. Visible
+input retains the host's signal behavior.
+
+`confirm(text, default=False, abort=False)` accepts case-insensitive
+`y`/`yes` and `n`/`no` after stripping surrounding whitespace. An empty line
+selects the default and an invalid answer retries. A decline raises
+`Abort()` when `abort=True`.
+
+`prompt(text, kind, default=..., hide_input=False)` accepts named
+`hide_input=True` for manual hidden input. Use core `sys.getpass` for echo
+control, with the prompt and retries on stderr. Omit default values from
+hidden prompt text. Preserve the core `OSError` for non-terminal input and
+map hidden EOF to `Abort()`. A hard terminating signal during the read
+inherits core's terminal-restoration limitation. Decorator prompting is deferred.
+[Zap hidden input](https://github.com/zaplang-io/zap/blob/main/decisions/stdlib/1684-getpass-hidden-input.md)
+[Click prompts](https://click.palletsprojects.com/en/stable/prompts/)
+[Typer prompts](https://typer.tiangolo.com/tutorial/prompt/)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

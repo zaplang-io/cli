@@ -71,6 +71,21 @@ write nothing. Embedded callers can use `run(standalone_mode=False)` to
 receive exit statuses and catch the typed usage and abort exceptions.
 Unrelated handler exceptions propagate in either mode.
 
+## Interactive prompts
+
+Handlers can use `cli.prompt("Target", str, default="staging")` or
+`cli.prompt("Retries", int64, default=3)` to read visible input from stdin.
+Prompts and retry messages go to stdout. `cli.confirm("Continue?", abort=True)`
+uses a default of `False` and raises `cli.Abort()` on a decline. EOF aborts
+even when a default was supplied.
+
+Use `cli.prompt("Password", str, hide_input=True)` for terminal input without
+echo. Hidden prompts and retry diagnostics go to stderr. They keep defaults
+out of the displayed prompt and raise `OSError` before reading from a pipe.
+Terminal restoration on normal completion and input errors follows
+`sys.getpass`. A hard terminating signal during the read can still leave
+echo disabled. [Core hidden input contract](https://github.com/zaplang-io/zap/blob/main/decisions/stdlib/1684-getpass-hidden-input.md)
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
@@ -121,7 +136,8 @@ completion, and rich help are later work tracked in the epic.
 ## Build and test
 
 Run the native `zap test` suite against a temporary consumer that installs this
-checkout as a package:
+checkout as a package. The hidden-input tests use Python 3 to drive a POSIX
+pseudo-terminal:
 
 ```
 sh tools/test.sh
