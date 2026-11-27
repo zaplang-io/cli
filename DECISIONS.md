@@ -171,6 +171,26 @@ leave it inactive. Core applies an explicit `--flag` even when the
 environment supplies an inactive default. [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables) ·
 [Zap flag defaults](https://github.com/zaplang-io/zap/issues/1692)
 
+## Parameter constraints
+
+For [#14](https://github.com/zaplang-io/cli/issues/14), `choices=` adds
+case-sensitive string choices to an option or positional declaration, and
+`min=`/`max=` add inclusive bounds to integer parameters. Core matches
+argv choices. CLI checks range bounds with the typed integer value and
+renders the declared constraints in help. Apply these constraints to the
+selected value from argv, environment variables, or a declared default.
+
+Typed callbacks validate and transform the resolved value through a
+`fn(T) -> T` contract. Check built-in constraints first, then call each
+callback once in declaration order before invoking the command handler.
+Argv, environment, and defaults all use this pipeline. Callbacks receive the
+converted value and their return becomes the handler's value. Core
+`Namespace` setters replace each binding and preserve its argv presence.
+A callback can reject a value by raising `UsageError`. Unrelated exceptions
+propagate. Help skips callbacks.
+[Zap Namespace setters](https://github.com/zaplang-io/zap/issues/1698)
+[Click parameter types](https://click.palletsprojects.com/en/stable/parameter-types/)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

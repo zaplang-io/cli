@@ -110,6 +110,16 @@ value. Boolean flags accept Click's activating values, such as `true`, `1`,
 and `yes`. Help shows the declared defaults.
 [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables)
 
+## Parameter constraints
+
+Use `choices=["json", "text"]` on text parameters and `min=1` or `max=64`
+on integer parameters. Choices are case-sensitive, and bounds are inclusive.
+Help lists each parameter's constraints. Values from argv, environment
+variables, and declared defaults all pass through validation. Invalid values
+produce `cli.UsageError` before the command handler runs. A typed
+`callback=normalize` can validate a parameter or return its replacement.
+Callbacks run in declaration order after built-in validation.
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
