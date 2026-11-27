@@ -4,14 +4,16 @@ def _text_prompts_preserve_visible_input_and_use_a_default_on_empty_input():
         ["./prompt_commands", "text"],
         input="\n  café  \r\n",
     )
-    assert code == 0 and err == ""
+    assert err == ""
+    assert code == 0
     assert out == "Target: Error: A response is required.\nTarget: target=  café  \n"
 
     auto default_code, default_out, default_err = process.run(
         ["./prompt_commands", "text-default"],
         input="\n",
     )
-    assert default_code == 0 and default_err == ""
+    assert default_err == ""
+    assert default_code == 0
     assert default_out == "Target [staging]: target=staging\n"
 
 @test
@@ -20,14 +22,16 @@ def _integer_prompt_retries_and_distinguishes_an_explicit_zero_default():
         ["./prompt_commands", "integer"],
         input="bad\n\n -12 \n",
     )
-    assert code == 0 and err == ""
+    assert err == ""
+    assert code == 0
     assert out == "Retries: Error: Enter a valid integer.\nRetries: Error: A response is required.\nRetries: retries=-12\n"
 
     auto default_code, default_out, default_err = process.run(
         ["./prompt_commands", "integer-default"],
         input="\n",
     )
-    assert default_code == 0 and default_err == ""
+    assert default_err == ""
+    assert default_code == 0
     assert default_out == "Retries [0]: retries=0\n"
 
 @test
@@ -36,7 +40,8 @@ def _confirmation_retries_case_insensitively_and_accepts_both_defaults():
         ["./prompt_commands", "confirm"],
         input="maybe\n YES \n",
     )
-    assert code == 0 and err == ""
+    assert err == ""
+    assert code == 0
     assert out == "Continue? [y/N]: Error: Enter yes or no.\nContinue? [y/N]: True\n"
 
     auto no_code, no_out, no_err = process.run(

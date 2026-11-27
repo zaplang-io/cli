@@ -330,12 +330,12 @@ def prompt[T](str text, Type[T] kind, Optional[T] default = None) -> T:
         if response == "":
             if default.is_some():
                 return default.unwrap()
-            print("Error: A response is required.")
+            io.write(sys.stdout_fd(), "Error: A response is required.\n")
         else:
             try:
                 return _convert_prompt_value(kind, response)
             except ValueError:
-                print("Error: Enter a valid integer.")
+                io.write(sys.stdout_fd(), "Error: Enter a valid integer.\n")
 
 # Read a case-insensitive yes/no answer and optionally abort on a decline.
 def confirm(str text, bool default = False, bool abort = False) -> bool:
@@ -348,7 +348,7 @@ def confirm(str text, bool default = False, bool abort = False) -> bool:
         elif response == "y" or response == "yes":
             accepted = True
         elif response != "n" and response != "no":
-            print("Error: Enter yes or no.")
+            io.write(sys.stdout_fd(), "Error: Enter yes or no.\n")
             continue
         if abort and not accepted:
             raise Abort()
