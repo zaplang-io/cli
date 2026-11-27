@@ -74,22 +74,11 @@ struct Command:
         bool standalone_mode,
         dict[str, str] environment,
     ) -> int64:
-        for parameter in self._parameters:
-            if parameter.kind == "int64" and parameter.name in environment:
-                str key = _parameter_key(parameter.name)
-                if not values.has(key):
-                    try:
-                        values.get_int(key)
-                    except ValueError:
-                        str error = "environment variable " + parameter.envvar + " for " + parameter.name + " requires an integer"
-                        return _usage_failure(
-                            error,
-                            parser.format_help(),
-                            standalone_mode,
-                        )
         Context ctx = Context(command_name=self.name, command_path=path)
         auto handler = self._handler
         try:
+            for parameter in self._parameters:
+                _validate_parameter(parameter, values, parameter.name in environment)
             handler(ctx, values)
         except UsageError as error:
             if not standalone_mode:
@@ -224,6 +213,9 @@ struct _Parameter:
     bool required = False
     str help = ""
     str envvar = ""
+    list[str] choices = []
+    Optional[int64] minimum = None
+    Optional[int64] maximum = None
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -250,13 +242,25 @@ def argument[T](
     Optional[_Declaration] previous = None,
     fn(Context, Namespace) handler = _missing_handler,
     str help = "",
+    list[str] choices = [],
+    Optional[int64] min = None,
+    Optional[int64] max = None,
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if name == "" or name.startswith("-"):
         raise UsageError("invalid positional name: " + name)
     if type_name != "int64" and type_name != "str":
         raise UsageError("unsupported positional type for " + name + ": " + type_name)
-    return _prepend(_Parameter(name=name, kind=type_name, help=help), previous, handler)
+    _check_constraints(name, type_name, choices, min, max)
+    auto parameter = _Parameter(
+        name=name,
+        kind=type_name,
+        help=help,
+        choices=choices,
+        minimum=min,
+        maximum=max,
+    )
+    return _prepend(parameter, previous, handler)
 
 # Declare a long option with a typed default, or mark a value option required.
 # A bool option is a zero-arity flag that defaults to False.
@@ -269,6 +273,9 @@ def option[T](
     bool required = False,
     str help = "",
     str envvar = "",
+    list[str] choices = [],
+    Optional[int64] min = None,
+    Optional[int64] max = None,
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -282,6 +289,7 @@ def option[T](
             raise UsageError("provide a default or required=True for " + name)
     else:
         raise UsageError("unsupported option type for " + name + ": " + type_name)
+    _check_constraints(name, type_name, choices, min, max)
     auto parameter = _Parameter(
         name=name,
         kind=type_name,
@@ -289,6 +297,9 @@ def option[T](
         required=required,
         help=help,
         envvar=envvar,
+        choices=choices,
+        minimum=min,
+        maximum=max,
     )
     return _prepend(parameter, previous, handler)
 
@@ -324,6 +335,55 @@ def _environment_defaults(list[_Parameter] parameters) -> dict[str, str]:
                 result[parameter.name] = value
     return result
 
+def _check_constraints(
+    str name,
+    str kind,
+    list[str] choices,
+    Optional[int64] minimum,
+    Optional[int64] maximum,
+):
+    if len(choices) > 0 and kind != "str":
+        raise UsageError("choices require str for " + name)
+    if (minimum.is_some() or maximum.is_some()) and kind != "int64":
+        raise UsageError("bounds require int64 for " + name)
+    if minimum.is_some() and maximum.is_some() and minimum.unwrap() > maximum.unwrap():
+        raise UsageError("minimum exceeds maximum for " + name)
+    dict[str, bool] seen = {}
+    for choice in choices:
+        if choice in seen:
+            raise UsageError("duplicate choice for " + name + ": " + choice)
+        seen[choice] = True
+
+def _range_label(_Parameter parameter) -> str:
+    if parameter.minimum.is_some():
+        if parameter.maximum.is_some():
+            return str(parameter.minimum.unwrap()) + ".." + str(parameter.maximum.unwrap())
+        return ">= " + str(parameter.minimum.unwrap())
+    return "<= " + str(parameter.maximum.unwrap())
+
+def _validate_parameter(_Parameter parameter, Namespace values, bool has_environment):
+    str name = parameter.name
+    str key = _parameter_key(name)
+    if len(parameter.choices) > 0 and values.get_str(key) not in parameter.choices:
+        raise UsageError(name + " must be one of " + ", ".join(parameter.choices))
+    if parameter.kind != "int64":
+        return
+    bool bounded = parameter.minimum.is_some() or parameter.maximum.is_some()
+    bool from_environment = has_environment and not values.has(key)
+    if not bounded and not from_environment:
+        return
+    int64 number = 0
+    try:
+        number = values.get_int(key)
+    except ValueError:
+        if not from_environment:
+            raise
+        raise UsageError(
+            "environment variable " + parameter.envvar + " for " + name + " requires an integer",
+        )
+    if parameter.minimum.is_some() and number < parameter.minimum.unwrap() or parameter.maximum.is_some() and number > parameter.maximum.unwrap():
+        raise UsageError(name + " is outside range " + _range_label(parameter))
+
 def _register_parameters(
     ArgumentParser parser,
     list[_Parameter] parameters,
@@ -349,6 +409,10 @@ def _register_parameters(
             if help != "":
                 help = help + " "
             help = help + "[default: " + default_label + "]"
+        if len(parameter.choices) > 0:
+            help = (help + " " if help != "" else "") + "[choices: " + ", ".join(parameter.choices) + "]"
+        if parameter.minimum.is_some() or parameter.maximum.is_some():
+            help = (help + " " if help != "" else "") + "[range: " + _range_label(parameter) + "]"
         bool has_environment = arg_name in environment
         str fallback = environment[arg_name] if has_environment else parameter.default_value
         if parameter.kind == "bool":
@@ -367,6 +431,7 @@ def _register_parameters(
                 type=parser_type,
                 default=fallback,
                 required=parameter.required and not has_environment,
+                choices=parameter.choices,
                 help=help,
             )
 

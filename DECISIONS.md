@@ -171,6 +171,15 @@ leave it inactive. Core applies an explicit `--flag` even when the
 environment supplies an inactive default. [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables) ·
 [Zap flag defaults](https://github.com/zaplang-io/zap/issues/1692)
 
+## Parameter constraints
+
+For [#14](https://github.com/zaplang-io/cli/issues/14), `choices=` adds
+case-sensitive string choices to an option or positional declaration, and
+`min=`/`max=` add inclusive bounds to integer parameters. Core matches
+argv choices. CLI checks range bounds with the typed integer value and
+renders the declared constraints in help.
+[Click parameter types](https://click.palletsprojects.com/en/stable/parameter-types/)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning

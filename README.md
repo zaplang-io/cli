@@ -110,6 +110,13 @@ value. Boolean flags accept Click's activating values, such as `true`, `1`,
 and `yes`. Help shows the declared defaults.
 [Click environment variables](https://click.palletsprojects.com/en/stable/options/#values-from-environment-variables)
 
+## Parameter constraints
+
+Use `choices=["json", "text"]` on text parameters and `min=1` or `max=64`
+on integer parameters. Choices are case-sensitive, and bounds are inclusive.
+Help lists each parameter's constraints. Invalid values produce
+`cli.UsageError` before the command handler runs.
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
