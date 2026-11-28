@@ -132,6 +132,19 @@ parsing and validation succeed, including for hidden options. Help,
 environment values, and defaults are silent. Deprecated options cannot be required.
 [Click options API](https://click.palletsprojects.com/en/stable/api/#click.Option)
 
+## Rich help
+
+Set `help_panel="Execution"` on an option to group it under a custom heading.
+Options without a panel stay in the default options section. Custom panels
+follow the declaration order of their first visible option.
+
+`Command.run()` and `Group.run()` render plain help at a width of 80 by
+default. Use `color=True` to style headings and labels, including on redirected
+streams, or set `width=` to a positive value to change wrapping. Wrapping
+counts Unicode code points and breaks at spaces. A single long word stays
+intact. Description line breaks are preserved and other terminal controls are
+shown as visible escapes.
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from
@@ -146,7 +159,7 @@ presentation, and the status and I/O at the run boundary.
 | Boolean flags | `add_argument(name, action="store_true")` | Use `Namespace.get_flag` to obtain the boolean value. |
 | Parsing and invocation | `parse_args(argv)`, `Namespace.get_str`, `get_int`, `get_flag`, and `has` | Pass argv without the executable name. Bind the validated values to declared parameter types and invoke the selected handler once. |
 | Subcommands | `add_subparsers(dest=...)`, `add_parser(name, help=...)`, and `Namespace.get_str` | Keep the selector destination distinct from handler parameters. Register the child parsers and dispatch using the selected name returned by core. |
-| Help | `Namespace.help_requested()` and `ArgumentParser.format_help()` | Select the help for the parsed command, add declared defaults and summaries from metadata, and handle the stdout and exit status. |
+| Help | `Namespace.help_requested()` and `ArgumentParser.format_usage()` | Render the selected command's synopsis and sections, including defaults and summaries, and handle output and exit status. |
 | Parse failures | Catchable failures from `parse_args(argv)` | Translate input failures to `cli.UsageError` and include the valid command names in diagnostics for an unknown subcommand. |
 
 Zap core now rejects malformed option values and honors `--` as the

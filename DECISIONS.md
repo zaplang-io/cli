@@ -225,12 +225,17 @@ terminal and redirected output. Display control characters as visible escapes
 in help and usage diagnostics, preserving author-written line breaks in
 help descriptions.
 
+Wrap at spaces using Unicode code-point widths. Keep words intact when they
+exceed the configured width. Terminal cell measurement for wide and combining
+characters is tracked with the terminal rendering work in
+[Zap #315](https://github.com/zaplang-io/zap/issues/315).
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning
 and matching, validation, and child parser selection. Bind the returned
-`Namespace` to a typed handler in `cli`. Build help on `format_help()` with
-framework metadata for defaults and command summaries. The framework controls
+`Namespace` to a typed handler in `cli`. Build help from core's
+`format_usage()` synopsis and CLI declaration metadata. The framework controls
 when a handler or diagnostic runs.
 
 Core recognizes the `--` separator, rejects an option-like token in place of a
