@@ -1,3 +1,5 @@
+import cli
+
 @test
 def _option_panels_keep_visible_options_in_declaration_order():
     list[list[str]] invocations = [
@@ -51,7 +53,7 @@ def _help_wraps_without_losing_unicode_or_explicit_line_breaks():
         assert narrow_code == 0 and narrow_err == ""
         for line in narrow.split("\n"):
             assert len(line) <= 26
-        assert narrow.find("Café") >= 0 and narrow.find("résumé\\x09with details.") >= 0
+        assert narrow.find("Café résumé\\x09with\ndetails.") >= 0
         assert narrow.find("Second line\\x1b[31m.") >= 0 and narrow.find("\x1b") < 0
         assert narrow.find("jobs callback ran") < 0
 
@@ -93,3 +95,25 @@ def _explicit_color_styles_help_and_usage_even_on_redirected_streams():
     assert bad_err.find("\x1b[1mExecution:\x1b[0m") >= 0
     assert bad_err.find("\x1b[36m--jobs jobs\x1b[0m") >= 0
     assert bad_err.find("Error: unrecognized arguments: --unknown") >= 0
+
+@test
+def _very_narrow_help_keeps_long_words_intact():
+    auto code, out, err = process.run(
+        ["./rich_help_commands", "group", "--help"],
+        env={"ZAP_CLI_HELP_WIDTH": "8"},
+    )
+    assert code == 0 and err == ""
+    assert out.find("Group\ndetail:\nunbroken-release-channel-identifier.") >= 0
+    assert out.find("usage:") >= 0 and out.find("commands:") >= 0
+
+@test
+def _nonpositive_help_width_raises_value_error():
+    auto group = cli.Group(name="tool")
+    for width in [0, -1]:
+        bool rejected = False
+        try:
+            group.run(argv=["--help"], standalone_mode=False, width=width)
+        except ValueError as error:
+            assert error == "help width must be positive"
+            rejected = True
+        assert rejected

@@ -28,7 +28,10 @@ def main():
     int64 width = int(width_setting) if width_setting != "" else 80
     bool color = os.getenv("ZAP_CLI_HELP_COLOR") == "1"
     if len(argv) > 0 and argv[0] == "group":
-        auto app = cli.Group(name="tool", help="Project tools.\nGroup detail.")
+        auto app = cli.Group(
+            name="tool",
+            help="Project tools.\nGroup detail: unbroken-release-channel-identifier.",
+        )
         app.add(release)
         app.run(argv=argv[1:], color=color, width=width)
     else:
