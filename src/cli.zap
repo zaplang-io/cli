@@ -38,7 +38,10 @@ struct Command:
         self,
         Optional[list[str]] argv = None,
         bool standalone_mode = True,
+        bool color = False,
+        int64 width = 80,
     ) -> int64:
+        _check_help_width(width)
         list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
         dict[str, str] environment = _environment_defaults(self._parameters)
         ArgumentParser parser = self._parser
@@ -53,10 +56,14 @@ struct Command:
         try:
             values = parser.parse_args(args)
         except Exception as error:
-            return _usage_failure(error, self._parser.format_help(), standalone_mode)
+            return _usage_failure(
+                error,
+                _command_help(self._parser, self._parameters, color, width),
+                standalone_mode,
+            )
 
         if values.help_requested():
-            print(self._parser.format_help())
+            print(_command_help(self._parser, self._parameters, color, width))
             return _finish(0, standalone_mode)
         return self._dispatch(
             values,
@@ -64,6 +71,8 @@ struct Command:
             self._parser,
             standalone_mode,
             environment,
+            color,
+            width,
         )
 
     def _dispatch(
@@ -73,6 +82,8 @@ struct Command:
         ArgumentParser parser,
         bool standalone_mode,
         dict[str, str] environment,
+        bool color,
+        int64 width,
     ) -> int64:
         Context ctx = Context(command_name=self.name, command_path=path)
         auto handler = self._handler
@@ -87,13 +98,17 @@ struct Command:
                 if parameter.deprecation != "" and values.has(_parameter_key(parameter.name)):
                     io.write(
                         sys.stderr_fd(),
-                        "Warning: " + parameter.deprecation + "\n",
+                        "Warning: " + _escape_controls(parameter.deprecation) + "\n",
                     )
             handler(ctx, values)
         except UsageError as error:
             if not standalone_mode:
                 raise
-            return _usage_failure(error, parser.format_help(), standalone_mode)
+            return _usage_failure(
+                error,
+                _command_help(parser, self._parameters, color, width),
+                standalone_mode,
+            )
         except Exit as error:
             return _finish(error.code, standalone_mode)
         except Abort:
@@ -123,7 +138,10 @@ struct Group:
         self,
         Optional[list[str]] argv = None,
         bool standalone_mode = True,
+        bool color = False,
+        int64 width = 80,
     ) -> int64:
+        _check_help_width(width)
         list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
         auto parser = argparse.ArgumentParser(prog=self.name, description=self.help)
         # Brackets make this reserved destination distinct from handler parameters.
@@ -149,16 +167,20 @@ struct Group:
             str unknown = "argument " + selector + ": invalid choice: "
             if error.startswith(unknown):
                 error = "unknown command: " + error[len(unknown):] + self._choices()
-            return _usage_failure(error, self._format_help(parser), standalone_mode)
+            return _usage_failure(
+                error,
+                self._format_help(parser, selector, color, width),
+                standalone_mode,
+            )
 
         if not values.has(selector):
             if not values.help_requested():
                 return _usage_failure(
                     "missing command" + self._choices(),
-                    self._format_help(parser),
+                    self._format_help(parser, selector, color, width),
                     standalone_mode,
                 )
-            print(self._format_help(parser))
+            print(self._format_help(parser, selector, color, width))
         else:
             str selected = values.get_str(selector)
             for command in self._commands:
@@ -172,7 +194,7 @@ struct Group:
                         )
                         _register_parameters(child, command._parameters)
                     if values.help_requested():
-                        print(child.format_help())
+                        print(_command_help(child, command._parameters, color, width))
                         break
                     return command._dispatch(
                         values,
@@ -180,6 +202,8 @@ struct Group:
                         child,
                         standalone_mode,
                         environment,
+                        color,
+                        width,
                     )
         return _finish(0, standalone_mode)
 
@@ -189,19 +213,24 @@ struct Group:
         list[str] names = [command.name for command in self._commands]
         return ". Available commands: " + ", ".join(names)
 
-    def _format_help(self, ArgumentParser parser) -> str:
-        str help = parser.format_help()
+    def _format_help(
+        self,
+        ArgumentParser parser,
+        str selector,
+        bool color,
+        int64 width,
+    ) -> str:
+        auto help = _start_help(parser, color, width)
+        list[str] names = [command.name for command in self._commands]
+        help.heading("positional arguments:")
+        help.row(selector, "{" + ",".join(names) + "}")
+        _help_option(help)
         if len(self._commands) > 0:
-            help = help + "\n\ncommands:"
+            help.heading("commands:")
         for command in self._commands:
-            str summary = command._parser.description
-            int64 newline = summary.find("\n")
-            if newline >= 0:
-                summary = summary[:newline]
-            help = help + "\n  " + command.name
-            if summary != "":
-                help = help + "  " + summary
-        return help
+            str summary = command._parser.description.split("\n")[0]
+            help.row(command.name, _escape_controls(summary))
+        return "\n".join(help.lines)
 
 def _finish(int64 code, bool standalone_mode) -> int64:
     if standalone_mode:
@@ -211,8 +240,19 @@ def _finish(int64 code, bool standalone_mode) -> int64:
 def _usage_failure(str message, str usage, bool standalone_mode) -> int64:
     if not standalone_mode:
         raise UsageError(message)
-    io.write(sys.stderr_fd(), usage + "\nError: " + message + "\n")
+    io.write(sys.stderr_fd(), usage + "\nError: " + _escape_controls(message) + "\n")
     return _finish(2, standalone_mode)
+
+def _escape_controls(str text, bool keep_newlines = False) -> str:
+    str digits = "0123456789abcdef"
+    list[str] pieces = []
+    for character in text:
+        int64 point = ord(character)
+        if (point < 32 or point >= 127 and point <= 159) and not (point == 10 and keep_newlines):
+            pieces.append("\\x" + str(digits[point // 16]) + str(digits[point % 16]))
+        else:
+            pieces.append(str(character))
+    return "".join(pieces)
 
 # Metadata is collected before the parser is constructed. Every outer decorator
 # receives the declaration rather than another function value.
@@ -229,6 +269,7 @@ struct _Parameter:
     Optional[fn(Namespace)] transform = None
     bool hidden = False
     str deprecation = ""
+    str help_panel = ""
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -280,6 +321,7 @@ def argument[T](
 # Declare a long option with a typed default, or mark a value option required.
 # A bool option is a zero-arity flag that defaults to False. Hidden options
 # still parse. Deprecated options accept True or a custom message.
+# Set help_panel to place the option under a named heading in help.
 def option[T, D](
     str name,
     Type[T] kind,
@@ -295,6 +337,7 @@ def option[T, D](
     Optional[fn(T) -> T] callback = None,
     bool hidden = False,
     D deprecated = False,
+    str help_panel = "",
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -325,6 +368,7 @@ def option[T, D](
         transform=_parameter_transform(name, kind, callback),
         hidden=hidden,
         deprecation=deprecation,
+        help_panel=help_panel,
     )
     return _prepend(parameter, previous, handler)
 
@@ -437,6 +481,151 @@ def _validate_parameter(_Parameter parameter, Namespace values, bool has_environ
     if parameter.minimum.is_some() and number < parameter.minimum.unwrap() or parameter.maximum.is_some() and number > parameter.maximum.unwrap():
         raise UsageError(name + " is outside range " + _range_label(parameter))
 
+def _check_help_width(int64 width):
+    if width <= 0:
+        raise ValueError("help width must be positive")
+
+# Wrap at spaces, keeping an individual word intact even on a narrow display.
+def _wrap_help(str text, str prefix, str indent, int64 width) -> list[str]:
+    if len(prefix) + len(text) <= width:
+        return [prefix + text]
+    if len(indent) >= width:
+        indent = ""
+    list[str] lines = []
+    str line = prefix
+    bool has_word = False
+    for word in text.split(" "):
+        if word == "":
+            continue
+        str separator = " " if has_word else ""
+        if len(line) + len(separator) + len(word) > width and line.strip() != "":
+            lines.append(line.rstrip())
+            line = indent + word
+        else:
+            line = line + separator + word
+        has_word = True
+    lines.append(line.rstrip())
+    return lines
+
+struct _Help:
+    bool color
+    int64 width
+    list[str] lines = []
+
+    def style(self, str text, str sgr) -> str:
+        if self.color:
+            return "\x1b[" + sgr + "m" + text + "\x1b[0m"
+        return text
+
+    def heading(self, str title):
+        self.lines.append("")
+        for line in _wrap_help(_escape_controls(title), "", "", self.width):
+            self.lines.append(self.style(line, "1"))
+
+    def row(self, str label, str description):
+        str head = "  " + _escape_controls(label)
+        str styled_head = "  " + self.style(head[2:], "36")
+        if description == "":
+            self.lines.append(styled_head)
+            return
+        list[str] paragraphs = description.split("\n")
+        auto first = _wrap_help(paragraphs[0], head + "  ", "    ", self.width)
+        self.lines.append(styled_head + first[0][len(head):])
+        for line in first[1:]:
+            self.lines.append(line)
+        for paragraph in paragraphs[1:]:
+            if paragraph == "":
+                self.lines.append("")
+            else:
+                for line in _wrap_help(paragraph, "    ", "    ", self.width):
+                    self.lines.append(line)
+
+def _start_help(ArgumentParser parser, bool color, int64 width) -> _Help:
+    auto help = _Help(color=color, width=width)
+    str synopsis = _escape_controls(parser.format_usage())
+    auto usage = _wrap_help(synopsis, "", "  ", width)
+    str label = "usage:"
+    help.lines.append(help.style(label, "1") + usage[0][len(label):])
+    for line in usage[1:]:
+        help.lines.append(line)
+    if parser.description != "":
+        help.lines.append("")
+        for paragraph in _escape_controls(parser.description, keep_newlines=True).split("\n"):
+            for line in _wrap_help(paragraph, "", "", width):
+                help.lines.append(line)
+    return help
+
+def _help_option(_Help help):
+    help.heading("options:")
+    help.row("-h, --help", "show this help message and exit")
+
+def _parameter_row(_Help help, _Parameter parameter):
+    str label = parameter.name
+    if label.startswith("--"):
+        if parameter.kind != "bool":
+            label = label + " " + _parameter_key(label)
+    else:
+        label = _parameter_key(label)
+    help.row(label, _parameter_description(parameter))
+
+def _command_help(
+    ArgumentParser parser,
+    list[_Parameter] parameters,
+    bool color,
+    int64 width,
+) -> str:
+    auto help = _start_help(parser, color, width)
+    list[_Parameter] arguments = []
+    list[_Parameter] options = []
+    list[str] panel_order = []
+    dict[str, list[_Parameter]] panels = {}
+    for parameter in parameters:
+        if parameter.hidden:
+            continue
+        if not parameter.name.startswith("--"):
+            arguments.append(parameter)
+        elif parameter.help_panel == "":
+            options.append(parameter)
+        else:
+            str panel = parameter.help_panel
+            if panel not in panels:
+                panel_order.append(panel)
+                panels[panel] = []
+            panels[panel].append(parameter)
+    if len(arguments) > 0:
+        help.heading("positional arguments:")
+        for parameter in arguments:
+            _parameter_row(help, parameter)
+    _help_option(help)
+    for parameter in options:
+        _parameter_row(help, parameter)
+    for panel in panel_order:
+        help.heading(panel + ":")
+        for parameter in panels[panel]:
+            _parameter_row(help, parameter)
+    return "\n".join(help.lines)
+
+def _parameter_description(_Parameter parameter) -> str:
+    str help = _escape_controls(parameter.help, keep_newlines=True)
+    if parameter.name.startswith("--") and parameter.required:
+        help = (help + " " if help != "" else "") + "[required]"
+    elif parameter.name.startswith("--"):
+        str default_label = _escape_controls(parameter.default_value)
+        if parameter.kind == "bool":
+            default_label = "False"
+        elif default_label == "":
+            default_label = '""'
+        if help != "":
+            help = help + " "
+        help = help + "[default: " + default_label + "]"
+    if len(parameter.choices) > 0:
+        help = (help + " " if help != "" else "") + "[choices: " + _escape_controls(", ".join(parameter.choices)) + "]"
+    if parameter.minimum.is_some() or parameter.maximum.is_some():
+        help = (help + " " if help != "" else "") + "[range: " + _range_label(parameter) + "]"
+    if parameter.deprecation != "":
+        help = (help + " " if help != "" else "") + "(deprecated)"
+    return help
+
 def _register_parameters(
     ArgumentParser parser,
     list[_Parameter] parameters,
@@ -445,29 +634,12 @@ def _register_parameters(
     dict[str, bool] destinations = {}
     for parameter in parameters:
         str arg_name = parameter.name
-        bool option = arg_name.startswith("--")
         str key = _parameter_key(arg_name)
         if key == "<command>":
             raise UsageError("reserved parameter: " + key)
         if key in destinations:
             raise UsageError("duplicate parameter: " + key)
         destinations[key] = True
-        str help = parameter.help
-        if option and not parameter.required:
-            str default_label = parameter.default_value
-            if parameter.kind == "bool":
-                default_label = "False"
-            elif default_label == "":
-                default_label = '""'
-            if help != "":
-                help = help + " "
-            help = help + "[default: " + default_label + "]"
-        if len(parameter.choices) > 0:
-            help = (help + " " if help != "" else "") + "[choices: " + ", ".join(parameter.choices) + "]"
-        if parameter.minimum.is_some() or parameter.maximum.is_some():
-            help = (help + " " if help != "" else "") + "[range: " + _range_label(parameter) + "]"
-        if parameter.deprecation != "":
-            help = (help + " " if help != "" else "") + "(deprecated)"
         bool has_environment = arg_name in environment
         str fallback = environment[arg_name] if has_environment else parameter.default_value
         if parameter.kind == "bool":
@@ -477,7 +649,6 @@ def _register_parameters(
                 arg_name,
                 action="store_true",
                 default=flag_default,
-                help=help,
                 hidden=parameter.hidden,
             )
         else:
@@ -488,7 +659,6 @@ def _register_parameters(
                 default=fallback,
                 required=parameter.required and not has_environment,
                 choices=parameter.choices,
-                help=help,
                 hidden=parameter.hidden,
             )
 

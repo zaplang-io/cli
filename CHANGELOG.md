@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add custom help panels, configurable wrapping, and opt-in ANSI styling.
+  Escape terminal controls in help and diagnostics.
+  [cli#16](https://github.com/zaplang-io/cli/issues/16)
+
 - Add hidden options and Click-style deprecation warnings for explicit argv use.
   [cli#15](https://github.com/zaplang-io/cli/issues/15)
 
