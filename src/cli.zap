@@ -87,7 +87,7 @@ struct Command:
                 if parameter.deprecation != "" and values.has(_parameter_key(parameter.name)):
                     io.write(
                         sys.stderr_fd(),
-                        "Warning: " + parameter.deprecation + "\n",
+                        "Warning: " + _escape_controls(parameter.deprecation) + "\n",
                     )
             handler(ctx, values)
         except UsageError as error:
@@ -211,8 +211,19 @@ def _finish(int64 code, bool standalone_mode) -> int64:
 def _usage_failure(str message, str usage, bool standalone_mode) -> int64:
     if not standalone_mode:
         raise UsageError(message)
-    io.write(sys.stderr_fd(), usage + "\nError: " + message + "\n")
+    io.write(sys.stderr_fd(), usage + "\nError: " + _escape_controls(message) + "\n")
     return _finish(2, standalone_mode)
+
+def _escape_controls(str text, bool keep_newlines = False) -> str:
+    str digits = "0123456789abcdef"
+    list[str] pieces = []
+    for character in text:
+        int64 point = ord(character)
+        if (point < 32 or point >= 127 and point <= 159) and not (point == 10 and keep_newlines):
+            pieces.append("\\x" + str(digits[point // 16]) + str(digits[point % 16]))
+        else:
+            pieces.append(str(character))
+    return "".join(pieces)
 
 # Metadata is collected before the parser is constructed. Every outer decorator
 # receives the declaration rather than another function value.
@@ -229,6 +240,7 @@ struct _Parameter:
     Optional[fn(Namespace)] transform = None
     bool hidden = False
     str deprecation = ""
+    str help_panel = ""
 
 struct _Declaration:
     list[_Parameter] parameters
@@ -280,6 +292,7 @@ def argument[T](
 # Declare a long option with a typed default, or mark a value option required.
 # A bool option is a zero-arity flag that defaults to False. Hidden options
 # still parse. Deprecated options accept True or a custom message.
+# Set help_panel to place the option under a named heading in help.
 def option[T, D](
     str name,
     Type[T] kind,
@@ -295,6 +308,7 @@ def option[T, D](
     Optional[fn(T) -> T] callback = None,
     bool hidden = False,
     D deprecated = False,
+    str help_panel = "",
 ) -> _Declaration:
     str type_name = reflect.type_info(T).name
     if not name.startswith("--") or name.startswith("---") or len(name) < 3 or name == "--help" or name.find("=") >= 0:
@@ -325,6 +339,7 @@ def option[T, D](
         transform=_parameter_transform(name, kind, callback),
         hidden=hidden,
         deprecation=deprecation,
+        help_panel=help_panel,
     )
     return _prepend(parameter, previous, handler)
 
@@ -470,10 +485,11 @@ def _register_parameters(
             help = (help + " " if help != "" else "") + "(deprecated)"
         bool has_environment = arg_name in environment
         str fallback = environment[arg_name] if has_environment else parameter.default_value
+        auto section = parser.add_argument_group(_escape_controls(parameter.help_panel))
         if parameter.kind == "bool":
             bool enabled = fallback.strip().lower() in ["true", "1", "yes", "on", "t", "y"]
             str flag_default = "true" if enabled else "false"
-            parser.add_argument(
+            section.add_argument(
                 arg_name,
                 action="store_true",
                 default=flag_default,
@@ -482,7 +498,7 @@ def _register_parameters(
             )
         else:
             str parser_type = "int" if parameter.kind == "int64" else "str"
-            parser.add_argument(
+            section.add_argument(
                 arg_name,
                 type=parser_type,
                 default=fallback,

@@ -212,6 +212,19 @@ option in declaration order, before the handler runs. Repeated argv spellings
 warn once. Hidden options still warn on explicit use. Omission, defaults,
 environment values, failed validation, and help are silent.
 
+## Rich help
+
+For [#16](https://github.com/zaplang-io/cli/issues/16), use
+`help_panel="Execution"` on options. Unassigned parameters stay in their
+default sections. Custom panels follow the declaration order of their first
+visible option, and options keep their declaration order within each panel.
+
+Help is plain by default, including on terminals. Callers can explicitly
+enable color and set the wrapping width. The default width is 80 for both
+terminal and redirected output. Display control characters as visible escapes
+in help and usage diagnostics, preserving author-written line breaks in
+help descriptions.
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning
