@@ -49,6 +49,30 @@ def _invalid_completion_requests_are_silent():
         assert code == 0 and out == "" and err == ""
 
 @test
+def _completion_rejects_malformed_value_prefixes_and_hides_private_choices():
+    dict[str, str] protocol = {"_COMPLETION_COMMANDS_COMPLETE": "zsh_complete"}
+    list[list[str]] suppressed = [
+        ["3", "build", "--mode", "--release", "alpha"],
+        ["3", "build", "--mode", "--unknown", "alpha"],
+        ["3", "build", "--mode", "--", "alpha"],
+        ["2", "build", "--restricted", ""],
+        ["1", "build", "--restricted=in"],
+        ["1", "build", "--restr=in"],
+    ]
+    for args in suppressed:
+        auto code, out, err = process.run(
+            ["./completion_commands", *args],
+            env=protocol,
+        )
+        assert code == 0 and out == "" and err == ""
+
+    auto code, out, err = process.run(
+        ["./completion_commands", "2", "build", "--mode", ""],
+        env=protocol,
+    )
+    assert code == 0 and out == "debug\x00release\x00" and err == ""
+
+@test
 def _generated_completion_scripts_run_in_all_supported_shells():
     for shell in ["bash", "zsh", "fish"]:
         auto code, out, err = process.run(

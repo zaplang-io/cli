@@ -6,7 +6,7 @@ def _validate(str value) -> str:
 
 @cli.command
 @cli.option("--release", bool, deprecated=True)
-@cli.option("--restricted", str, hidden=True, default="")
+@cli.option("--restricted", str, hidden=True, choices=["internal", "private"], default="internal")
 @cli.option("--mode", str, choices=["debug", "release"], default="debug", callback=_validate)
 @cli.argument("target", str, choices=["alpha beta", "alpha \"quoted\" $HOME;*"])
 def build(bool release, str restricted, str mode, str target):
