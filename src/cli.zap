@@ -160,9 +160,10 @@ struct Group:
         for command in self._commands:
             auto child = children.add_parser(
                 command.name,
-                help=command._parser.description,
+                help=command._parser.description.split("\n")[0],
             )
             child.prog = self.name + " " + command.name
+            child.description = command._parser.description
             dict[str, str] environment = {}
             if completion == "":
                 environment = _environment_defaults(command._parameters)

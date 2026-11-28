@@ -30,7 +30,8 @@ def _core_parser_binds_values_and_resets_defaults():
 def _core_parser_selects_the_subcommand_and_signals_help():
     auto parser = argparse.ArgumentParser(prog="tool", description="Project tools")
     auto subcommands = parser.add_subparsers(dest="selected")
-    auto build = subcommands.add_parser("build", help="Build the project")
+    auto build = subcommands.add_parser("build", help="Build summary")
+    build.description = "Build the project"
     build.add_argument("target")
     auto check = subcommands.add_parser("check", help="Check the project")
     check.add_argument("--verbose", action="store_true")
