@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add generated Bash, Zsh, and Fish completion for command names, visible
+  options, and declared choices. [cli#17](https://github.com/zaplang-io/cli/issues/17)
+
 - Add custom help panels, configurable wrapping, and opt-in ANSI styling.
   Escape terminal controls in help and diagnostics.
   [cli#16](https://github.com/zaplang-io/cli/issues/16)
