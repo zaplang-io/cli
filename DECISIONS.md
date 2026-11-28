@@ -230,6 +230,28 @@ exceed the configured width. Terminal cell measurement for wide and combining
 characters is tracked with the terminal rendering work in
 [Zap #315](https://github.com/zaplang-io/zap/issues/315).
 
+## Shell completion
+
+For [#17](https://github.com/zaplang-io/cli/issues/17), use Click's
+command-specific environment variable convention. For example, setting
+`_MY_TOOL_COMPLETE=bash_source` when running `my-tool` prints its Bash
+registration script. Bash, Zsh, and Fish have equal support and each must pass
+shell-level CI tests. Installing a script is an explicit shell action.
+[Click shell completion](https://click.palletsprojects.com/en/stable/shell-completion/)
+
+Generated scripts use the same variable with `bash_complete`,
+`zsh_complete`, or `fish_complete` for queries. They pass a zero-based
+cursor word index followed by the decoded words, excluding the executable.
+The cursor word is the decoded prefix through the cursor, or an empty word
+at a token boundary. A query returns zero or more NUL-terminated candidate
+strings on stdout. Shell adapters preserve literal spaces, quotes, and
+metacharacters and do not evaluate candidates as source code.
+
+Completion queries use the partial-argv context from core to select a command
+and parameter. Generate candidates from the declaration metadata without
+running handlers, prompts, validation callbacks, or deprecation warnings.
+[Zap partial-argv context](https://github.com/zaplang-io/zap/issues/1712)
+
 ## Parser ownership
 
 Use Zap core's `ArgumentParser` for argument registration, argv scanning
