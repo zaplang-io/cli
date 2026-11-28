@@ -145,6 +145,18 @@ counts Unicode code points and breaks at spaces. A single long word stays
 intact. Description line breaks are preserved and other terminal controls are
 shown as visible escapes.
 
+## Shell completion
+
+For a command installed as `my-tool`, generate a registration script with
+`_MY_TOOL_COMPLETE=bash_source my-tool`. Use `zsh_source` or `fish_source` for
+the other supported shells. Save the output and source it in the chosen
+shell. In Zsh, initialize completion with `autoload -Uz compinit && compinit`
+before sourcing the script.
+
+Completion suggests subcommands, visible option names, help aliases, and
+declared choices. It uses the cursor position and the parser's partial-argv
+context. Completion requests skip normal command dispatch.
+
 ## Core `argparse` boundary
 
 The parser is Zap core's object API from

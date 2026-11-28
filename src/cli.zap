@@ -43,6 +43,11 @@ struct Command:
     ) -> int64:
         _check_help_width(width)
         list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
+        str completion = _completion_request(self.name)
+        if completion != "":
+            if not _emit_completion_source(self.name, completion):
+                _emit_completion_candidates(self._parser, completion, args)
+            return _finish(0, standalone_mode)
         dict[str, str] environment = _environment_defaults(self._parameters)
         ArgumentParser parser = self._parser
         if len(environment) > 0:
@@ -143,6 +148,9 @@ struct Group:
     ) -> int64:
         _check_help_width(width)
         list[str] args = argv.unwrap() if argv.is_some() else sys.argv()[1:]
+        str completion = _completion_request(self.name)
+        if completion != "" and _emit_completion_source(self.name, completion):
+            return _finish(0, standalone_mode)
         auto parser = argparse.ArgumentParser(prog=self.name, description=self.help)
         # Brackets make this reserved destination distinct from handler parameters.
         str selector = "<command>"
@@ -155,10 +163,16 @@ struct Group:
                 help=command._parser.description,
             )
             child.prog = self.name + " " + command.name
-            auto environment = _environment_defaults(command._parameters)
+            dict[str, str] environment = {}
+            if completion == "":
+                environment = _environment_defaults(command._parameters)
             _register_parameters(child, command._parameters, environment)
             child_parsers[command.name] = child
             child_environment[command.name] = environment
+
+        if completion != "":
+            _emit_completion_candidates(parser, completion, args)
+            return _finish(0, standalone_mode)
 
         Namespace values = Namespace()
         try:
@@ -231,6 +245,158 @@ struct Group:
             str summary = command._parser.description.split("\n")[0]
             help.row(command.name, _escape_controls(summary))
         return "\n".join(help.lines)
+
+# The completion branch runs before environment defaults, parsing, or dispatch.
+def _completion_variable(str name) -> str:
+    str alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    list[str] pieces = ["_"]
+    for char in name.upper():
+        str piece = str(char)
+        pieces.append(piece if alphabet.find(piece) >= 0 else "_")
+    pieces.append("_COMPLETE")
+    return "".join(pieces)
+
+def _completion_request(str name) -> str:
+    if name == "" or name.startswith("-"):
+        return ""
+    return os.getenv(_completion_variable(name))
+
+def _emit_completion_source(str name, str mode) -> bool:
+    str template = ""
+    if mode == "bash_source":
+        template = _bash_completion_source()
+    elif mode == "zsh_source":
+        template = _zsh_completion_source()
+    elif mode == "fish_source":
+        template = _fish_completion_source()
+    else:
+        return False
+    str variable = _completion_variable(name)
+    list[str] identity = ["_zap_complete"]
+    for char in name:
+        identity.append(str(ord(char)))
+    str function_name = "_".join(identity)
+    str program = "'" + name.replace("'", "'\"'\"'") + "'"
+    if mode == "fish_source":
+        program = "'" + name.replace("\\", "\\\\").replace("'", "\\'") + "'"
+    str assignment = variable + "=" + mode.replace("_source", "_complete")
+    io.write(
+        sys.stdout_fd(),
+        template.replace("@FUNCTION@", function_name).replace("@QUERY@", assignment).replace(
+            "@PROGRAM@",
+            program,
+        ),
+    )
+    return True
+
+def _emit_completion_candidates(ArgumentParser parser, str mode, list[str] args):
+    if mode not in ["bash_complete", "zsh_complete", "fish_complete"] or len(args) < 2:
+        return
+    int64 cursor = 0
+    try:
+        cursor = int(args[0])
+    except ValueError:
+        return
+    list[str] words = args[1:]
+    if cursor < 0 or cursor >= len(words):
+        return
+    str prefix = words[cursor]
+    auto context = parser.completion_context(words[:cursor], prefix)
+    if context.invalid:
+        return
+    str attached = ""
+    if context.kind == "value" and prefix != context.value_prefix:
+        attached = context.active_option + "="
+    str nul = "\x00"
+    for candidate in context.candidates:
+        if candidate != "" and candidate.find(nul) < 0:
+            io.write(sys.stdout_fd(), attached + candidate + nul)
+
+def _bash_completion_source() -> str:
+    return """@FUNCTION@() {
+    local LC_ALL=C
+    local line=${COMP_LINE:0:COMP_POINT} char state=plain word='' started=0 i
+    local -a before=()
+    for ((i = 0; i < ${#line}; i++)); do
+        char=${line:i:1}
+        case "$state:$char" in
+            "single:'"|'double:"') state=plain ;;
+            'plain:"') state=double; started=1 ;;
+            "plain:'") state=single; started=1 ;;
+            'plain:\\'|'double:\\')
+                if ((i + 1 < ${#line})); then
+                    ((i++))
+                    char=${line:i:1}
+                    if [[ $char == $'\\n' ]]; then
+                        continue
+                    fi
+                    if [[ $state == double && $char != [\\$\\`\\"\\\\] ]]; then
+                        word+='\\'
+                    fi
+                    word+=$char
+                    started=1
+                fi ;;
+            'plain: ' | plain:$'\\t' | plain:$'\\n')
+                if ((started)); then
+                    before+=("$word")
+                    word=''
+                    started=0
+                fi ;;
+            plain:[\\;\\|\\&]) before=(); word=''; started=0 ;;
+            *) word+=$char; started=1 ;;
+        esac
+    done
+    COMPREPLY=()
+    (( ${#before[@]} > 0 )) || return 0
+    local candidate
+    while IFS= read -r -d '' candidate; do
+        # Readline keeps the left side when '=' is a completion word break.
+        if [[ $word == --*=* && $candidate == --*=* &&
+              $COMP_WORDBREAKS == *=* && $2 != --*=* ]]; then
+            candidate=${candidate#*=}
+        fi
+        COMPREPLY+=("$candidate")
+    done < <(env @QUERY@ @PROGRAM@ "$((${#before[@]} - 1))" "${before[@]:1}" "$word")
+}
+complete -o filenames -F @FUNCTION@ -- @PROGRAM@
+"""
+
+def _zsh_completion_source() -> str:
+    return """@FUNCTION@() {
+    local -a before candidates
+    local token value i
+    for ((i = 2; i < CURRENT; i++)); do
+        token=$words[i]
+        before+=("${(Q)token}")
+    done
+    while IFS= read -r -d '' value; do
+        candidates+=("$value")
+    done < <(env @QUERY@ @PROGRAM@ "${#before}" "${before[@]}" "$IPREFIX$PREFIX")
+    (( ${#candidates} )) && compadd -a candidates
+}
+compdef @FUNCTION@ @PROGRAM@
+"""
+
+def _fish_completion_source() -> str:
+    return """function @FUNCTION@
+    set -l before (commandline -opc)
+    if test (count $before) -lt 1
+        return 0
+    end
+    set -e before[1]
+    set -l raw (commandline -ct | string collect -a)
+    set -l prefix "$raw"
+    for suffix in '' '"' "'"
+        set -l decoded (string unescape -- "$raw$suffix" | string collect -a)
+        if set -q decoded[1]
+            set prefix "$decoded"
+            break
+        end
+    end
+    env @QUERY@ @PROGRAM@ (count $before) $before "$prefix" | string split0
+end
+complete -c @PROGRAM@ -f -a '(@FUNCTION@)'
+"""
 
 def _finish(int64 code, bool standalone_mode) -> int64:
     if standalone_mode:
